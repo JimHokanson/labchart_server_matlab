@@ -6,5 +6,5 @@ This code was written to control aspects of Labchart from Matlab. Specifically t
 
 ``` matlab
 active = labchart.getActiveDocument();
-active.addComment("Testing");
+active.addComment('Testing');
 ```
