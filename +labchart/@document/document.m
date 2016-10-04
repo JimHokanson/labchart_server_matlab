@@ -4,6 +4,7 @@ classdef document
     %   labchart.document
     
     properties (Hidden)
+        app_object %labchart
         h
     end
     
@@ -29,6 +30,11 @@ classdef document
         root_path
         %saved - true if document hasn't changed since last being saved
         
+    end
+    
+    properties
+       d3 = '--------- Method Containers -------'
+       view
     end
     
     %{
@@ -90,8 +96,10 @@ DONE 'NumberOfDisplayedChannels'
     end
     
     methods
-        function obj = document(h)
-           obj.h = h; 
+        function obj = document(h,app_object)
+            obj.app_object = app_object;
+            obj.h = h; 
+            obj.view = labchart.document.view(h);
         end
     end
     
@@ -155,6 +163,25 @@ DONE 'NumberOfDisplayedChannels'
     end
 end
 
+
+%{
+Views
+-----
+'Chart View'
+'Plot View'
+GetViewPos - 4x1 cell
+
+Macros
+------
+Macros() - returns IADIChartScripts which doesn't seem to do anything
+PlayMacro(macro_name)
+- looks like it may be blocking
+- returns boolean of success or failure
+ImportMacros(file_path)
+
+
+%}
+
 %{
 
 %====  Properties ======
@@ -216,7 +243,7 @@ IsChannelSelected
 MatLabPutChannelData      
 MatLabPutFullMatrix       
 PlayMacro                 
-PlayMessage               
+PlayMessage   %hexadecimal message string => checksum failed              
 Print                     
 RecordTimeToTickPosition  
 ResetSelection            
