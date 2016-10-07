@@ -116,6 +116,7 @@ classdef document < handle
     properties
         d3 = '--------- Method Containers -------'
         view
+        stimulator
     end
     
     methods
@@ -132,6 +133,7 @@ classdef document < handle
             obj.event_manager = labchart.document.doc_events(h);
             %obj.selection = labchart.document.selection(h.SelectionObject,obj);
             obj.view = labchart.document.view(h);
+            obj.stimulator = labchart.document.stimulator(h);
         end
         function addComment(obj,str,channel)
             %
