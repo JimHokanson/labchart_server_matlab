@@ -9,7 +9,14 @@ classdef selection
     Might create a flag indicating whether or not the selection is linked
     ...
     %TODO: This seems necessary, as even getting it from the document
-    %and updating it isn't sufficient to 
+    %and updating it isn't sufficient to cause the document to use the
+    selection
+    
+    The problem is that the selection is ill defined until
+    it is fully specified. The updates should probably be a method then
+    like makeSelection
+    - selectPoint
+    - selectSpan
     
     Creation Methods:
     1) s = actxserver('ADIChart.Selection')

@@ -35,14 +35,17 @@ classdef view
         %maximize - 61488
         %unmaximize - float - 61728
         %double click on window - 61490
-        function maximizeView(obj,view_name)
+        function maximizeView(obj,varargin)
             %
             %   Maximizes the specified view.
             %
             
+            in.view_name = 'chart';
+            in = labchart.sl.in.processVarargin(in,varargin);
+            
             INSTANCE_ID = 1; %We may eventually make this optional
             MAXIMIZE_CMD = 61488;
-            invoke(obj.h,'SetViewState',h__resolveViewName(view_name),INSTANCE_ID,MAXIMIZE_CMD)
+            invoke(obj.h,'SetViewState',h__resolveViewName(in.view_name),INSTANCE_ID,MAXIMIZE_CMD);
         end
         function openView(obj,view_name)
             %
@@ -72,7 +75,7 @@ classdef view
             %
             %   Optional Inputs
             %   ---------------
-            %
+            %   TODO: Finish this
             
             in.center_on_selection = false;
             in.view_id = 'chart';
@@ -80,7 +83,7 @@ classdef view
             
             %TODO: Filter Zoom Level
             %This should be based on the Labchart Version
-            invoke(obj.h,'SetRightXCompression',zoom_level,in.center_on_selection,h__resolveView(in.view_id))
+            invoke(obj.h,'SetRightXCompression',zoom_level,in.center_on_selection,h__resolveViewName(in.view_id));
         end
         function centerViewOnComment(obj,comment_id)
             %

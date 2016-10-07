@@ -2,6 +2,10 @@ classdef record
     %
     %   Class:
     %   labchart.record
+    %
+    %   This is meant to provide data retrieval of calculated channels.
+    %   It is not yet complete.
+    %   https://forum.adinstruments.com/viewtopic.php?f=7&t=771
     
     %{
     temp = labchart;
