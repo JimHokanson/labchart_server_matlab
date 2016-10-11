@@ -4,6 +4,9 @@ classdef labchart
     %   labchart
     %
     %   Representatation of the Labchart Application
+    %
+    %   This might be better as a labchart.application class
+    %   with a function labchart which is able to instiate this class.
     
     properties
         h
@@ -45,6 +48,13 @@ classdef labchart
     
     methods
         function opened_doc = open_document(obj,file_path)
+            %
+            %   opened_doc = open_document(obj,file_path)
+            %
+            %   
+            
+            %Obtain the file path
+            %--------------------
             if nargin == 1
                 [file_name,path_name] = uigetfile('*.adicht','Select a file to open');
                 
@@ -54,9 +64,10 @@ classdef labchart
                 end
                 
                 file_path = fullfile(path_name,file_name);
-                
             end
             
+            %Call to open the file
+            %---------------------
             temp = obj.h.Open(file_path);
             opened_doc = labchart.document(temp,obj);
         end

@@ -1,4 +1,4 @@
-classdef view
+classdef view < handle
     %
     %   Class:
     %   labchart.document.view
@@ -20,8 +20,15 @@ classdef view
         h
     end
     
+    properties
+        last_zoom_level %containers.Map
+        %keys are the view names
+        %values are the previous zoom levels
+    end
+    
     methods
         function obj = view(h)
+            obj.last_zoom_level = containers.Map();
             obj.h = h;
         end
         %Closing Window - NYI
@@ -75,19 +82,87 @@ classdef view
             %
             %   Optional Inputs
             %   ---------------
-            %   TODO: Finish this
+            %   delta_zoom : numeric (default empty)
+            %       +1 - zooms in 1 level, e.g. 1000 to 500
+            %       -1 - zooms out 1 level, e.g.g 1000 to 2000
+            %       -2 - zooms out 2 levels, e.g. 1000 to 5000
+            %       etc .
+            %       This feature is currently dependent on having
+            %       previously used this function to set an explicit
+            %       zoom level
+            %   center_on_selection : logical (default false)
+            %       TODO: I'm not really sure what this means
+            %       I think this means:
+            %           if true, the zoom first centers on the selection
+            %           then zooms appropriately (i.e. a time shift occurs)
+            %           if false, the center of the window is used as the 
+            %           reference point, and the zoom occurs (i.e. the 
+            %           same time stays at the center)
+            %   view_id : (default 'chart')
+            %       Name of the window to zoom in or out on
             
+            %TODO: This should be based on the Labchart version
+            %This is for V8
+            %V7 does not have this many view options
+            ZOOM_NUMBERS = ([1 2 5])';
+            ZOOM_SCALES  = (10.^(-1:5));
+            ZOOM_LEVELS  = ZOOM_NUMBERS*ZOOM_SCALES;
+            ZOOM_LEVELS  = ZOOM_LEVELS(:)';
+            
+            in.delta_zoom = [];
             in.center_on_selection = false;
             in.view_id = 'chart';
             in = labchart.sl.in.processVarargin(in,varargin);
             
+            resolved_view = h__resolveViewName(in.view_id);
+            
+            if isempty(zoom_level)
+                if ~isempty(in.delta_zoom)
+                    if ~obj.last_zoom_level.isKey(resolved_view)
+                        warning('The current zoom state of the document is unknown')
+                        return
+                    else
+                        I = find(obj.last_zoom_level(resolved_view) == ZOOM_LEVELS,1);
+                        if isempty(I)
+                            warning('Previous zoom level is not recognized as being a valid zoom level')
+                            return
+                        else
+                           I2 = I - in.delta_zoom;
+                           if I2 < 1
+                               %? throw a warning
+                               if I == 1
+                                   return %nothing to do
+                               end
+                               I2 = 1;
+                           elseif I2 > length(ZOOM_LEVELS)
+                               if I == length(ZOOM_LEVELS)
+                                   return %nothing to do
+                               end
+                               I2 = length(ZOOM_LEVELS);
+                           end
+                           zoom_level = ZOOM_LEVELS(I2);
+                        end
+                    end
+                else
+                    error('If the zoom level is empty, a delta zoom must be specified')
+                end
+            end
+                    
             %TODO: Filter Zoom Level
             %This should be based on the Labchart Version
-            invoke(obj.h,'SetRightXCompression',zoom_level,in.center_on_selection,h__resolveViewName(in.view_id));
+            
+            invoke(obj.h,'SetRightXCompression',zoom_level,in.center_on_selection,resolved_view);
+            obj.last_zoom_level(resolved_view) = zoom_level;
         end
         function centerViewOnComment(obj,comment_id)
             %
             %This command was extracted via macro recording
+            %   
+            %   Inputs
+            %   ------
+            %   comment_id : number
+            %       This is the ID associated with the comment. It is NOT
+            %       the index of the comments in the list of comments.
             
             invoke(obj.h,'ShowComment',comment_id);
         end
