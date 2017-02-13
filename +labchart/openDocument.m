@@ -3,7 +3,8 @@ function doc = openDocument(file_path)
 %
 %   doc = labchart.openDocument(file_path)
 %
-%   This will open another instance even if the document is already opened.
+%   TODO: Implement this:
+%   https://forum.adinstruments.com/viewtopic.php?f=7&t=782&p=2270#p2270
 
 app = labchart;
 active_doc = app.active_document;
@@ -13,6 +14,7 @@ if ~isempty(active_doc)
         return
     end
 end
+
 doc = app.open_document(file_path);
 
 end
