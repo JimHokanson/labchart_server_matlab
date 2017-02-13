@@ -7,6 +7,10 @@ classdef labchart
     %
     %   This might be better as a labchart.application class
     %   with a function labchart which is able to instiate this class.
+    %
+    %   See Also
+    %   --------
+    %   labchart.openDocument
     
     properties
         h
@@ -22,6 +26,7 @@ classdef labchart
     methods
         function value = get.active_document(obj)
             
+            %TODO:
             %Matlab error id when application was closed
             %MATLAB:COM:E0  => Labchart was closed
             
@@ -78,7 +83,7 @@ classdef labchart
             %
             %    obj = labchart()
             %
-            %    Returns an instance of the Labchart Application
+            %   This will open up LabChart if it is not already running.
             
             try
                 %Let's reuse if possible, slightly faster
