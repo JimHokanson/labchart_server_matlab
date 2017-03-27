@@ -101,7 +101,7 @@ classdef labchart
                 temp.Close;
             end
         end
-        function closeActiveDocument()
+        function closeActiveDocument(obj)
             obj.h.CloseActiveDocument();
         end
         function getConfigTabText(tab_name)
