@@ -114,14 +114,16 @@ classdef stimulator < handle
             in = labchart.sl.in.processVarargin(in,varargin);
             
             suppress_refresh = false;
-            invoke(obj.h,'SetStimulatorValue',in.chan,'_MaxRepeatRate',freq,'Hz',suppress_refresh);
+            chan_0b = in.chan-1; %0b => 0 based (instead of 1 based, which is what we are using)
+            invoke(obj.h,'SetStimulatorValue',chan_0b,'_MaxRepeatRate',freq,'Hz',suppress_refresh);
         end
         function setAmplitude(obj,amplitude,varargin)
             in.chan = obj.active_chan;
             in = labchart.sl.in.processVarargin(in,varargin);
             
             suppress_refresh = false;
-            invoke(obj.h,'SetStimulatorValue',in.chan,'_PulseHeight1',amplitude,'V',suppress_refresh);
+            chan_0b = in.chan-1;
+            invoke(obj.h,'SetStimulatorValue',chan_0b,'_PulseHeight1',amplitude,'V',suppress_refresh);
         end
         function setPulseWidth(obj,pulse_width,varargin)
             %
