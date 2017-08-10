@@ -1,16 +1,19 @@
-classdef labchart
+classdef application
     %
     %   Class:
     %   labchart
     %
     %   Representatation of the Labchart Application
     %
-    %   This might be better as a labchart.application class
-    %   with a function labchart which is able to instiate this class.
-    %
     %   See Also
     %   --------
     %   labchart.openDocument
+    
+    %{
+    Other code on GitHub:
+    https://github.com/rbute/BCIUI/blob/master/script/LabChartObject.m
+    
+    %}
     
     properties
         h
@@ -18,8 +21,8 @@ classdef labchart
     
     properties (Dependent)
         active_document
-        name %'ADInstruments LabChart Application'
-        full_name %'C:\Program Files (x86)\ADInstruments\LabChart8\LabChart8.exe'
+        name        %'ADInstruments LabChart Application'
+        full_name   %Example: 'C:\Program Files (x86)\ADInstruments\LabChart8\LabChart8.exe'
         visible
         busy
     end
@@ -79,9 +82,9 @@ classdef labchart
     end
     
     methods
-        function obj = labchart()
+        function obj = application()
             %
-            %    obj = labchart()
+            %    obj = labchart.application()
             %
             %   This will open up LabChart if it is not already running.
             
@@ -101,7 +104,7 @@ classdef labchart
                 temp.Close;
             end
         end
-        function closeActiveDocument()
+        function closeActiveDocument(obj)
             obj.h.CloseActiveDocument();
         end
         function getConfigTabText(tab_name)

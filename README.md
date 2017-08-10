@@ -46,4 +46,4 @@ AD Instruments provides a COM server for LabChart that allows sending commands t
 
 Additional methods can be discovered by recording macros in LabChart. For methods not obviously exposed to Matlab (i.e. seen by calling methods() on the COM instance), the invoke() command can also be used.
 
-Most object retain a 'h' property, which is the handle to the actual COM object. 
+Most Matlab objects in this package have a 'h' property, which is the handle to the actual COM object. 
