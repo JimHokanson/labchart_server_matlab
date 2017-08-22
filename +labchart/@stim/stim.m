@@ -123,13 +123,17 @@ classdef stim < handle
             %   value : numeric or string
             %   units : string
             
-            supress_refresh = false;
+            suppress_refresh = false;
             
             if isnumeric(value)
                 value = sprintf('%g',value);
             end
             
             invoke(obj.h,'SetStimulatorValue',channel_1b-1,param_id,value,units,suppress_refresh);
+        end
+        function setStimulatorWaveform(obj,name)
+            %"User waveform - 40Hz Burst"
+            invoke(obj.h,'SetStimulatorWaveform',name);
         end
         function setStimulatorValueOptions(obj)
            error('Not yet implemented')
