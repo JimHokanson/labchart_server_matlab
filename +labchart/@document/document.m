@@ -2,10 +2,16 @@ classdef document < handle
     %
     %   Class:
     %   labchart.document
+    %
+    %   Constructors
+    %   ------------
+    %   labchart.openDocument()
+    %   labchart.getActiveDocument()
     
     properties (Hidden)
-        h %Interface.ADInstruments_LabChart_1.0_Type_Library.IADIChartApplication
-        %ADInstruments object instance that we make calls against
+        h %Interface.ADInstruments_LabChart_1.0_Type_Library.IADIChartDocument
+        %
+        %   ADInstruments object instance that we make calls against
         app_object %labchart
         event_manager
     end
