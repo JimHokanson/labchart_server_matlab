@@ -8,6 +8,15 @@ classdef document < handle
     %   labchart.openDocument()
     %   labchart.getActiveDocument()
     
+    %{
+    number_of_records
+    is_sampling
+    block_number = 3;
+    seconds_per_tick = d.getSecondsPerTick(block_number);
+    n_ticks = d.getRecordLengthInTicks(block_number);
+    n_seconds = d.getRecordLengthInSeconds(block_number);
+    %}
+    
     properties (Hidden)
         h %Interface.ADInstruments_LabChart_1.0_Type_Library.IADIChartDocument
         %
@@ -41,6 +50,7 @@ classdef document < handle
         number_of_records
         current_record
         %-1 if not sampling
+        
         is_sampling
         is_record_mode %???
         %TODO: Add more documentation on what this is
@@ -140,6 +150,19 @@ classdef document < handle
             %obj.selection = labchart.document.selection(h.SelectionObject,obj);
             obj.view = labchart.document.view(h);
             obj.stimulator = labchart.document.stimulator(h);
+        end
+        function n_ticks = getRecordLengthInTicks(obj,block_number_1b)
+             n_ticks = obj.h.GetRecordLength(block_number_1b-1);
+        end
+        function n_seconds = getRecordLengthInSeconds(obj,block_number_1b)
+                seconds_per_tick = obj.getSecondsPerTick(block_number_1b);
+                n_ticks = obj.getRecordLengthInTicks(block_number_1b);
+                n_seconds = n_ticks*seconds_per_tick;
+        end
+        function seconds = getSecondsPerTick(obj,block_number_1b)
+             %TODO: try/catch with block check
+             seconds = obj.h.GetRecordSecsPerTick(block_number_1b-1);
+             %GetRecordSecsPerTick(block As Long) As Double
         end
         function addComment(obj,str,channel)
             %
