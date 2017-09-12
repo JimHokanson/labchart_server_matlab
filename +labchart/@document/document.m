@@ -11,10 +11,13 @@ classdef document < handle
     %{
     number_of_records
     is_sampling
-    block_number = 3;
+    block_number = 4;
     seconds_per_tick = d.getSecondsPerTick(block_number);
     n_ticks = d.getRecordLengthInTicks(block_number);
     n_seconds = d.getRecordLengthInSeconds(block_number);
+    
+    chan_number = 1;
+    data = d.getSelectedData(chan_number);
     %}
     
     properties (Hidden)
@@ -159,11 +162,103 @@ classdef document < handle
                 n_ticks = obj.getRecordLengthInTicks(block_number_1b);
                 n_seconds = n_ticks*seconds_per_tick;
         end
+        function ticks_per_sec = getTicksPerSecond(obj,block_number_1b)
+            ticks_per_sec = 1./obj.getSecondsPerTick(block_number_1b);
+        end
         function seconds = getSecondsPerTick(obj,block_number_1b)
              %TODO: try/catch with block check
              seconds = obj.h.GetRecordSecsPerTick(block_number_1b-1);
              %GetRecordSecsPerTick(block As Long) As Double
         end
+        function data = getSelectedData(obj,channel_number_1b_or_char)
+            %
+            %   WORK IN PROGRESS - Greg should finish
+            %
+            %   data = d.getSelectedData(channel_number_1b)
+            %
+            %   Outputs
+            %   -------
+            %   data : 
+            %       Returned as ticks, not at the sampling rate ...
+            %
+            %   Examples
+            %   --------
+            %   data = d.getSelectedData(1);
+            %
+            %   data = d.getSelectedData('Bladder Pressure');
+            %
+            %   TODO: Support returning a time vector or a data class
+            %   time -> nargout == 2
+            %   data -> default if sci.time_series.data is present ...
+            
+            if isnumeric(channel_number_1b_or_char)
+                channel_number_1b = channel_number_1b_or_char;
+            elseif ischar(channel_number_1b_or_char)
+                channel_number_1b = find(strcmp(channel_number_1b_or_char,obj.channel_names));
+                %TODO: Make this a helper function
+                %
+                %TODO: Support partial matching ...
+                %mask_or_indices = sl.str.findMatches('pres',{'Bladder Pressure','EUS EMG'},'partial_match',true);
+                %mask_or_indices = sl.str.findMatches('pres',{'Bladder ressure','EUS EMG'},'partial_match',true,'n_rule',1);
+                if isempty(channel_number_1b)
+                    error('unable to find  channel match for: %s',channel_number_1b_or_char);
+                elseif length(channel_number_1b) > 1
+                    error('multiple channel matches ...')
+                end
+            else
+               error('Unrecognized input for channel number') 
+            end
+            %-1 returns all selected channels
+            %
+            %why isn't this an index into the selected channels????
+            
+            %Tested by manually selecting data and calling
+            as_double = 1;
+            %This function uses 1 basd channel indexing, not zero!
+            data = obj.h.GetSelectedData(as_double,channel_number_1b);
+            %data = d.h.GetSelectedData(1,2);
+            %GetSelectedData(flags As ChannelDataFlags, [channelNumber As Long = -1])
+        end
+        function data = getChannelData(obj,channel_1b_or_name,block_number_1b,start_sample,n_samples)
+            %
+            %   WORK IN PROGRESS - Greg should finish
+            %
+            %   TODO: Use to samples but show an example of going from
+            %   time to samples
+            %
+            %   Example
+            %   -------
+            %   %Grab 2 seconds starting at 230 seconds from block 5
+            %   block_number = 5;
+            %   chan_number = 1;
+            %   tps = d.getTicksPerSecond(block_number); %tps - ticks per second
+            %   data = d.getChannelData(chan_number,block_number,230*tps,2*tps)
+            %
+            %   Improvements
+            %   See getSelectedData
+            
+            as_double = 1;
+            channel_1b = channel_1b_or_name;
+            
+            data = obj.h.GetChannelData(as_double,channel_1b,block_number_1b,start_sample,n_samples);
+            
+            %error('Not yet implemented')
+            
+            %inputs
+            %channel - 1 based
+            %block number
+            
+            %data = d.h.GetChannelData(1,1,5,230*20000,2*20000)
+            
+            %This is too awkward ...
+%             in.start_as_samples = [];
+%             in.duration_as_samples = [];
+%             in.start_as_time = [];
+%             in.duration_as_time = [];
+%             in = labchart.sl.in.processVarargin(in.varargin);
+            
+            %GetChannelData(flags As ChannelDataFlags, channelNumber As Long, blockNumber As Long, startSample As Long, numSamples As Long)
+        end 
         function addComment(obj,str,channel)
             %
             %   addComment(obj,str, *channel)
@@ -207,6 +302,19 @@ classdef document < handle
             end
             
             obj.h.AddCommentAtSelection(str,channel)
+        end
+        function selectChannel(obj,channel_1b__or_name)
+            %
+            %   d.selectChannel(channel_1b__or_name)
+            
+            obj.h.SelectChannel(channel_1b__or_name-1,true);
+            %SelectChannel(channel As Long, select As Boolean)
+        end
+        function setSelectionTime(obj)
+            %SetSelectionTime
+            obj.h.SetSelectionTime(start_block,start_offset,end_block,end_offset)
+            %d.h.SetSelectionTime(4,10,4,20)
+            %SetSelectionTime(startBlock As Long, startOffsetInSecs As Double, endBlock As Long, endOffsetInSecs As Double)
         end
         function startSampling(obj,varargin)
             %
