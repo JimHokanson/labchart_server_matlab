@@ -219,9 +219,12 @@ classdef document < handle
             %data = d.h.GetSelectedData(1,2);
             %GetSelectedData(flags As ChannelDataFlags, [channelNumber As Long = -1])
         end
-        function data = getChannelData(obj,channel_1b_or_name,block_number_1b,start_sample,n_samples)
+        function data = getChannelData(obj,channel_number_1b_or_name,block_number_1b,start_sample,n_samples)
             %
             %   WORK IN PROGRESS - Greg should finish
+            %   Gets the data from the following:
+            %   channel number or name, block number, start sample,
+            %   n_samples from start sample
             %
             %   TODO: Use to samples but show an example of going from
             %   time to samples
@@ -237,10 +240,31 @@ classdef document < handle
             %   Improvements
             %   See getSelectedData
             
-            as_double = 1;
-            channel_1b = channel_1b_or_name;
+            if isnumeric(channel_number_1b_or_name)
+                channel_number_1b = channel_number_1b_or_name;
+            elseif ischar(channel_number_1b_or_name)
+                channel_number_1b = find(strcmp(channel_number_1b_or_name,obj.channel_names));
+                %TODO: Make this a helper function
+                %
+                %TODO: Support partial matching ...
+                %mask_or_indices = sl.str.findMatches('pres',{'Bladder Pressure','EUS EMG'},'partial_match',true);
+                %mask_or_indices = sl.str.findMatches('pres',{'Bladder ressure','EUS EMG'},'partial_match',true,'n_rule',1);
+                if isempty(channel_number_1b)
+                    error('unable to find  channel match for: %s',channel_number_1b_or_name);
+                elseif length(channel_number_1b) > 1
+                    error('multiple channel matches ...')
+                end
+            else
+               error('Unrecognized input for channel number') 
+            end
+
             
-            data = obj.h.GetChannelData(as_double,channel_1b,block_number_1b,start_sample,n_samples);
+            as_double = 1;
+            channel_1b = channel_number_1b;
+            
+            % START SAMPLE IS 1 REFERENCED!
+            % but is this going to be off by 1 in some cases?
+            data = obj.h.GetChannelData(as_double,channel_1b,block_number_1b,start_sample + 1,n_samples);
             
             %error('Not yet implemented')
             
