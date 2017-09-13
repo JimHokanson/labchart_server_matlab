@@ -36,11 +36,7 @@ classdef document < handle
     
     methods
         function value = get.selection(obj)
-            value = labchart.selection(obj.h.SelectionObject);
-        end
-        function set.selection(obj,value)
-            %TODO: Check if this is the Matlab object or the raw handle
-            obj.h.SelectionObject = value;
+            value = labchart.selection(obj.h.SelectionObject,obj);
         end
     end
     
@@ -155,31 +151,51 @@ classdef document < handle
             obj.stimulator = labchart.document.stimulator(h);
         end
         function n_ticks = getRecordLengthInTicks(obj,block_number_1b)
-             n_ticks = obj.h.GetRecordLength(block_number_1b-1);
+            n_ticks = obj.h.GetRecordLength(block_number_1b-1);
         end
         function n_seconds = getRecordLengthInSeconds(obj,block_number_1b)
-                seconds_per_tick = obj.getSecondsPerTick(block_number_1b);
-                n_ticks = obj.getRecordLengthInTicks(block_number_1b);
-                n_seconds = n_ticks*seconds_per_tick;
+            seconds_per_tick = obj.getSecondsPerTick(block_number_1b);
+            n_ticks = obj.getRecordLengthInTicks(block_number_1b);
+            n_seconds = n_ticks*seconds_per_tick;
         end
         function ticks_per_sec = getTicksPerSecond(obj,block_number_1b)
             ticks_per_sec = 1./obj.getSecondsPerTick(block_number_1b);
         end
         function seconds = getSecondsPerTick(obj,block_number_1b)
-             %TODO: try/catch with block check
-             seconds = obj.h.GetRecordSecsPerTick(block_number_1b-1);
-             %GetRecordSecsPerTick(block As Long) As Double
+            %TODO: try/catch with block check
+            seconds = obj.h.GetRecordSecsPerTick(block_number_1b-1);
+            %GetRecordSecsPerTick(block As Long) As Double
         end
-        function data = getSelectedData(obj,channel_number_1b_or_char)
+        function data = getSelectedData(obj,channel_number_1b_or_char,varargin)
+            %x Returns selected data
             %
-            %   WORK IN PROGRESS - Greg should finish
+            %   data = d.getSelectedData(channel_number_1b,varargin)
             %
-            %   data = d.getSelectedData(channel_number_1b)
+            %   data = d.getSelectedData(channel_name,varargin)
+            %
+            %   Inputs
+            %   ------
+            %   channel_number_1b : number
+            %       Which channel to grab data from. This is not an index
+            %       into the selection but rather an index into all
+            %       available channels.
+            %
+            %       A value of -1 indicates that all selected channels will
+            %       be returned.
+            %
+            %   channel_name : char
             %
             %   Outputs
             %   -------
-            %   data : 
-            %       Returned as ticks, not at the sampling rate ...
+            %   data : raw data or sci.time_series.data if present
+            %       Returned as ticks, not at the sampling rate.
+            %
+            %   Optional Inputs
+            %   ---------------
+            %   return_object : (default true)
+            %   n_decimate : (default 1)
+            %       Not yet implemented. Currently everything is returned
+            %       at a tick rate instead of its real sampling rate.
             %
             %   Examples
             %   --------
@@ -187,37 +203,55 @@ classdef document < handle
             %
             %   data = d.getSelectedData('Bladder Pressure');
             %
+            %   Improvements
+            %   ------------
+            %   1)
+            %
+            %   Questions
+            %   ---------
+            %   1) What happens across block boundaries?
+            %       Data gets merged. Eventually we might be able to split
+            %       this ...
+            %
             %   TODO: Support returning a time vector or a data class
             %   time -> nargout == 2
             %   data -> default if sci.time_series.data is present ...
             
+            %TODO: Check selection to verify we aren't spanning records
+            
+            in.return_object = true;
+            in.n_decimate = 1;
+            in = labchart.sl.in.processVarargin(in,varargin);
+            
             if isnumeric(channel_number_1b_or_char)
                 channel_number_1b = channel_number_1b_or_char;
             elseif ischar(channel_number_1b_or_char)
-                channel_number_1b = find(strcmp(channel_number_1b_or_char,obj.channel_names));
-                %TODO: Make this a helper function
-                %
-                %TODO: Support partial matching ...
-                %mask_or_indices = sl.str.findMatches('pres',{'Bladder Pressure','EUS EMG'},'partial_match',true);
-                %mask_or_indices = sl.str.findMatches('pres',{'Bladder ressure','EUS EMG'},'partial_match',true,'n_rule',1);
-                if isempty(channel_number_1b)
-                    error('unable to find  channel match for: %s',channel_number_1b_or_char);
-                elseif length(channel_number_1b) > 1
-                    error('multiple channel matches ...')
-                end
+                channel_number_1b = h__chanNameToIndex(obj,channel_number_1b_or_char);
             else
-               error('Unrecognized input for channel number') 
+                error('Unrecognized input for channel number')
             end
-            %-1 returns all selected channels
-            %
-            %why isn't this an index into the selected channels????
             
-            %Tested by manually selecting data and calling
             as_double = 1;
-            %This function uses 1 basd channel indexing, not zero!
+            %This function uses 1 based channel indexing, not zero!
             data = obj.h.GetSelectedData(as_double,channel_number_1b);
-            %data = d.h.GetSelectedData(1,2);
-            %GetSelectedData(flags As ChannelDataFlags, [channelNumber As Long = -1])
+            
+            if in.return_object && exist('sci.time_series.data') %#ok<EXIST>
+                %Yikes, in order to get this to work we need to know what 
+                %the selection is (specifically which block)
+                
+                start_record = obj.selection.start_record;
+                ticks_per_sec = obj.getTicksPerSecond(start_record);
+                sample_offset = obj.selection.start_offset;
+                
+                dt = 1/ticks_per_sec;
+                
+                n_samples = length(data);
+            	time_object = sci.time_series.time(dt,n_samples,'sample_offset',sample_offset);
+                data = sci.time_series.data(data(:),time_object);
+                
+            elseif nargout == 2
+                %return a time vector ...
+            end
         end
         function data = getChannelData(obj,channel_number_1b_or_name,block_number_1b,start_sample,n_samples)
             %
@@ -255,9 +289,9 @@ classdef document < handle
                     error('multiple channel matches ...')
                 end
             else
-               error('Unrecognized input for channel number') 
+                error('Unrecognized input for channel number')
             end
-
+            
             
             as_double = 1;
             channel_1b = channel_number_1b;
@@ -275,14 +309,14 @@ classdef document < handle
             %data = d.h.GetChannelData(1,1,5,230*20000,2*20000)
             
             %This is too awkward ...
-%             in.start_as_samples = [];
-%             in.duration_as_samples = [];
-%             in.start_as_time = [];
-%             in.duration_as_time = [];
-%             in = labchart.sl.in.processVarargin(in.varargin);
+            %             in.start_as_samples = [];
+            %             in.duration_as_samples = [];
+            %             in.start_as_time = [];
+            %             in.duration_as_time = [];
+            %             in = labchart.sl.in.processVarargin(in.varargin);
             
             %GetChannelData(flags As ChannelDataFlags, channelNumber As Long, blockNumber As Long, startSample As Long, numSamples As Long)
-        end 
+        end
         function addComment(obj,str,channel)
             %
             %   addComment(obj,str, *channel)
@@ -377,6 +411,23 @@ classdef document < handle
     end
 end
 
+function I = h__chanNameToIndex(obj,name)
+
+I = labchart.sl.str.findMatches(name,obj.channel_names,'partial_match',true,'n_rule',1,'multi_result_rule','exact_or_error');
+
+% % % channel_number_1b = find(strcmp(channel_number_1b_or_char,obj.channel_names));
+% % % %TODO: Make this a helper function
+% % % %
+% % % %TODO: Support partial matching ...
+% % % %mask_or_indices = sl.str.findMatches('pres',{'Bladder Pressure','EUS EMG'},'partial_match',true);
+% % % %mask_or_indices = sl.str.findMatches('pres',{'Bladder ressure','EUS EMG'},'partial_match',true,'n_rule',1);
+% % % if isempty(channel_number_1b)
+% % %     error('unable to find  channel match for: %s',channel_number_1b_or_char);
+% % % elseif length(channel_number_1b) > 1
+% % %     error('multiple channel matches ...')
+% % % end
+
+end
 
 %{
 Views
