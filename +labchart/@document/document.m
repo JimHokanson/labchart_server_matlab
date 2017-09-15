@@ -253,15 +253,36 @@ classdef document < handle
                 %return a time vector ...
             end
         end
-        function data = getChannelData(obj,channel_number_1b_or_name,block_number_1b,start_sample,n_samples)
+        function data = getChannelData(obj,channel_number_1b_or_name,block_number_1b,start_sample,n_samples, varargin)
+            % WORK IN PROGRESS!!!!! (GREG)
+            %x Returns data from a given channel
             %
-            %   WORK IN PROGRESS - Greg should finish
-            %   Gets the data from the following:
-            %   channel number or name, block number, start sample,
-            %   n_samples from start sample
+            %   data = d.getChannelData(channel_number_1b_or_name, block_number,start_sample,n_samples, varargin)
             %
-            %   TODO: Use to samples but show an example of going from
-            %   time to samples
+            %   Inputs:
+            %   ---------
+            %   -channel_number_1b_or_name: number or char
+            %       The channel number or its name in the list of channels
+            %   -block_number: number
+            %       The number of the block as it shows up on the display
+            %       in LabChart
+            %   -start_sample: number
+            %       The start sample within the chosen block. (start sample
+            %       is 1 referenced)
+            %   -n_samples: number
+            %       number of samples to go from start_sample
+            %   - *return_obj: (default = true)
+            %       if true, returns a sci.time_series.data class
+            %       if false, returns a vector of points
+            %
+            %   TODO: optional inputs
+            %
+            %
+            %   Outputs:
+            %   ---------
+            %   - data: 
+            %
+            %   TODO: allow for different output types!
             %
             %   Example
             %   -------
@@ -274,6 +295,11 @@ classdef document < handle
             %   Improvements
             %   See getSelectedData
             
+            
+            in.return_obj = true;
+            in = labchart.sl.in.processVarargin(in,varargin);
+            
+            % processing for different input types on channel selection:    
             if isnumeric(channel_number_1b_or_name)
                 channel_number_1b = channel_number_1b_or_name;
             elseif ischar(channel_number_1b_or_name)
@@ -291,23 +317,25 @@ classdef document < handle
             else
                 error('Unrecognized input for channel number')
             end
-            
-            
+
             as_double = 1;
-            channel_1b = channel_number_1b;
             
-            % START SAMPLE IS 1 REFERENCED!
-            % but is this going to be off by 1 in some cases?
-            data = obj.h.GetChannelData(as_double,channel_1b,block_number_1b,start_sample + 1,n_samples);
+            start_sample = start_sample + (start_sample == 0); 
+            % This is not a good way to deal with this.....
             
-            %error('Not yet implemented')
+            data_vector = obj.h.GetChannelData(as_double,channel_number_1b,block_number_1b,start_sample,n_samples);
             
-            %inputs
-            %channel - 1 based
-            %block number
-            
+            if in.return_obj
+                tps = obj.getTicksPerSecond(block_number_1b);
+                dt = 1/tps;
+                data = sci.time_series.data(data_vector',dt);  
+            else
+               data = data_vector;
+               %TODO: support output of time vector
+            end
+
+            %Future work??
             %data = d.h.GetChannelData(1,1,5,230*20000,2*20000)
-            
             %This is too awkward ...
             %             in.start_as_samples = [];
             %             in.duration_as_samples = [];
