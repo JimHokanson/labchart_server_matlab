@@ -369,6 +369,11 @@ classdef document < handle
                 channel = channel - 1;
             end
             
+            %Added this in when I lost 10 minutes on a cellstr input
+            if ~isnumeric(channel) || ~ischar(str)
+                error('Incorrect input types')
+            end
+            
             obj.h.AppendComment(str,channel)
         end
         function addCommentAtSelection(obj,str,channel)
