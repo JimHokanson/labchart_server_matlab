@@ -49,6 +49,14 @@ classdef stim < handle
 % 	Call Doc.SetStimulatorValueOptions (outputIndex, paramId, minimum, maximum, normalIncrement, useLogSlider, useSteps, unit)
 % 	' End SetStimulatorValueOptions
     
+
+
+    % Examples:
+    %{
+        doc = labchart.getActiveDocument();
+        s = doc.stimulator
+        s.setStimulatorWaveform(1, 'biphasic_pulse')
+    %} 
     properties
         h %Interface.ADInstruments_LabChart_1.0_Type_Library.IADIChartDocument
         
@@ -74,6 +82,9 @@ classdef stim < handle
         %This does not include custom options
         waveform_options = {'Arithmetic Pulse','Pulse','Step','Step Pulse','Biphasic Pulse',...
             'Double Pulse','Ramp','Sine','Triangle'};
+        
+        waveform1 % class which holds all of the parameters of the waveform
+        waveform2
     end
     
     methods
@@ -182,6 +193,9 @@ classdef stim < handle
             if obj.allow_null_ops && isequal(value,obj.differential_enabled)
                 return
             end
+            % if the val we are requesting is equal to the val we think it
+            % already is, just skip the command to avoid starting a new
+            % block -- ideally implement this in all methods!
             
             %I don't think channel matters since toggling either
             %links or unlinks both channels.
@@ -195,10 +209,7 @@ classdef stim < handle
             %
             %   obj.setStimulatorWaveform(2,'User waveform - 40Hz Burst');
             %   obj.setStimulatorWaveform(1,'Biphasic Pulse');
-            
-            
-            %
-            
+           
             switch lower(waveform_name)
                 case 'arithmetic pulse'
                     out_name = 'ArithmeticPulses1';
@@ -226,15 +237,22 @@ classdef stim < handle
                 if obj.allow_null_ops && strcmp(obj.chan1_internal_waveform_name,out_name)
                     return
                 end
-                
+                if lower(waveform_name) == 'biphasic pulse' %TEMPORARY HACK
+                    %TODO: update this to be automatically based on the
+                    %input!!!!
+                obj.waveform1 = labchart.stim_waveforms.('biphasic_pulse')(obj.h, channel_1b-1);
+                end
                 obj.chan1_user_waveform_name = lower(waveform_name);
                 obj.chan1_internal_waveform_name = out_name;
             else
                 if obj.allow_null_ops && strcmp(obj.chan2_internal_waveform_name,out_name)
                     return
                 end
+                if lower(waveform_name) == 'biphasic pulse' %TEMPORARY HACK
+                obj.waveform2 = labchart.stim_waveforms.('biphasic_pulse')(obj.h, channel_1b-1);
+                end
                 obj.chan2_user_waveform_name = lower(waveform_name);
-                obj.chan2_internal_waveform_name = out_name; 
+                obj.chan2_internal_waveform_name = out_name;
             end
             
             invoke(obj.h,'SetStimulatorWaveform',channel_1b-1,out_name);

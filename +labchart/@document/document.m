@@ -148,7 +148,9 @@ classdef document < handle
             obj.event_manager = labchart.document.doc_events(h);
             %obj.selection = labchart.document.selection(h.SelectionObject,obj);
             obj.view = labchart.document.view(h);
-            obj.stimulator = labchart.document.stimulator(h);
+            
+            obj.stimulator = labchart.stim(obj);
+            %obj.stimulator = labchart.document.stimulator(h);
         end
         function n_ticks = getRecordLengthInTicks(obj,block_number_1b)
             n_ticks = obj.h.GetRecordLength(block_number_1b-1);
