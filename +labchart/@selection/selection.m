@@ -42,6 +42,12 @@ classdef selection
         function value = get.start_offset(obj)
            value = obj.h.SelectionStartOffset; 
         end
+        function value = get.end_record(obj)
+           value = obj.h.SelectionEndRecord; 
+        end
+        function value = get.end_offset(obj)
+           value = obj.h.SelectionEndOffset; 
+        end
     end
     
     methods

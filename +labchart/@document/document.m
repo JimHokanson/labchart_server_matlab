@@ -78,6 +78,7 @@ classdef document < handle
         number_of_displayed_channels
         channel_names
     end
+    
     methods
         function value = get.number_of_channels(obj)
             value = obj.h.NumberOfChannels;
@@ -123,6 +124,7 @@ classdef document < handle
         d3 = '--------- Method Containers -------'
         view
         stimulator
+        comments
     end
     
     methods
@@ -140,6 +142,7 @@ classdef document < handle
             %obj.selection = labchart.document.selection(h.SelectionObject,obj);
             obj.view = labchart.document.view(h);
             obj.stimulator = labchart.document.stimulator(h);
+            obj.comments = labchart.document.comments(h);
         end
         function addComment(obj,str,channel)
             %
