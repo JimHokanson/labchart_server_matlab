@@ -11,7 +11,13 @@ classdef stim < handle
     %
     %   Questions
     %   ---------
-    %   1) Does the stimulator panel need to be open?
+    %   1) Does the stimulator panel need to be open? - it doesn't seem
+    %   like it
+    %
+    %   Improvements
+    %   ------------
+    %   1) Provide an initialize command which sets everything to known
+    %   values so that we can internally track all values.
     
 %   ' Begin SetStimulatorValue
 % 	outputIndex = 0
@@ -43,10 +49,42 @@ classdef stim < handle
 % 	Call Doc.SetStimulatorValueOptions (outputIndex, paramId, minimum, maximum, normalIncrement, useLogSlider, useSteps, unit)
 % 	' End SetStimulatorValueOptions
     
+
+
+    % Examples:
+    %{
+        doc = labchart.getActiveDocument();
+        s = doc.stimulator
+        s.setStimulatorWaveform(1, 'biphasic_pulse')
+    %} 
     properties
         h %Interface.ADInstruments_LabChart_1.0_Type_Library.IADIChartDocument
+        
+        allow_null_ops = true
+        %If this is true, where possible we should check locally
+        %for the current value and not run a command unless we need to.
+        %
+        %This will run into problems if the user ever changes the
+        %parameters on the GUI. Note that we can technically run the
+        %stimulator without the stimulator window being open.
+        
+        
+        %This is kept track of internally but might be invalid
+        %if the user changes anything sine we can't read properties ...
         chan1_enabled = false
         chan2_enabled = false
+        differential_enabled = []
+        chan1_user_waveform_name = ''
+        chan1_internal_waveform_name = ''
+      	chan2_user_waveform_name = ''
+        chan2_internal_waveform_name = ''
+        
+        %This does not include custom options
+        waveform_options = {'Arithmetic Pulse','Pulse','Step','Step Pulse','Biphasic Pulse',...
+            'Double Pulse','Ramp','Sine','Triangle'};
+        
+        waveform1 % class which holds all of the parameters of the waveform
+        waveform2
     end
     
     methods
@@ -92,6 +130,13 @@ classdef stim < handle
             end
         end
         function startStimulation(obj)
+            %
+            %   startStimulation(obj)
+            %
+            %   Example
+            %   -------
+            %   obj.startStimulation()
+            
             invoke(obj.h,'StimulateNow');
         end
         function stopStimulation(obj)
@@ -131,9 +176,86 @@ classdef stim < handle
             
             invoke(obj.h,'SetStimulatorValue',channel_1b-1,param_id,value,units,suppress_refresh);
         end
-        function setStimulatorWaveform(obj,name)
-            %"User waveform - 40Hz Burst"
-            invoke(obj.h,'SetStimulatorWaveform',name);
+        function setCustomWaveform(obj,channel_1b,custom_waveform_name)
+            
+            %Technically we could do this in setStimulatorWaveform
+            %but then we wouldn't get error checking
+            
+            error('Not yet implemented') 
+            %needs channel and logging
+            invoke(obj.h,'SetStimulatorWaveform',out_name);
+        end
+        function setDifferential(obj,value)
+            %
+            %   setDifferential(obj,value)
+            %true or false
+            
+            if obj.allow_null_ops && isequal(value,obj.differential_enabled)
+                return
+            end
+            % if the val we are requesting is equal to the val we think it
+            % already is, just skip the command to avoid starting a new
+            % block -- ideally implement this in all methods!
+            
+            %I don't think channel matters since toggling either
+            %links or unlinks both channels.
+            channel_0b = 0;
+            invoke(obj.h,'SetStimulatorDifferential',channel_0b,value);
+            obj.differential_enabled = value;
+        end
+        function setStimulatorWaveform(obj,channel_1b,waveform_name)
+            %
+            %   setStimulatorWaveform(obj,channel_1b,name)
+            %
+            %   obj.setStimulatorWaveform(2,'User waveform - 40Hz Burst');
+            %   obj.setStimulatorWaveform(1,'Biphasic Pulse');
+           
+            switch lower(waveform_name)
+                case 'arithmetic pulse'
+                    out_name = 'ArithmeticPulses1';
+                case 'pulse'
+                    out_name = 'LegacyPulse';
+                case 'step'
+                    out_name = 'LegacyStep';
+                case 'step pulse'
+                    out_name = 'LegacyStepPulse';
+                case 'biphasic pulse'
+                    out_name = 'ScopeBiphasic';
+                case 'double pulse'
+                    out_name = 'ScopeDoublePulse';
+                case 'ramp'
+                    out_name = 'ScopeRamp';
+                case 'sine'
+                    out_name = 'ScopeSine';
+                case 'triangle'
+                    out_name = 'ScopeTriangle';
+                otherwise
+                    error('Waveform Option not recognized')
+            end
+                
+            if channel_1b == 1
+                if obj.allow_null_ops && strcmp(obj.chan1_internal_waveform_name,out_name)
+                    return
+                end
+                if lower(waveform_name) == 'biphasic pulse' %TEMPORARY HACK
+                    %TODO: update this to be automatically based on the
+                    %input!!!!
+                obj.waveform1 = labchart.stim_waveforms.('biphasic_pulse')(obj.h, channel_1b-1);
+                end
+                obj.chan1_user_waveform_name = lower(waveform_name);
+                obj.chan1_internal_waveform_name = out_name;
+            else
+                if obj.allow_null_ops && strcmp(obj.chan2_internal_waveform_name,out_name)
+                    return
+                end
+                if lower(waveform_name) == 'biphasic pulse' %TEMPORARY HACK
+                obj.waveform2 = labchart.stim_waveforms.('biphasic_pulse')(obj.h, channel_1b-1);
+                end
+                obj.chan2_user_waveform_name = lower(waveform_name);
+                obj.chan2_internal_waveform_name = out_name;
+            end
+            
+            invoke(obj.h,'SetStimulatorWaveform',channel_1b-1,out_name);
         end
         function setStimulatorValueOptions(obj)
            error('Not yet implemented')
@@ -148,8 +270,77 @@ classdef stim < handle
 % 	unit = "us"
 % 	Call Doc.SetStimulatorValueOptions (outputIndex, paramId, minimum, maximum, normalIncrement, useLogSlider, useSteps, unit)
 % 	' End SetStimulatorValueOptions
+
+% ' Name:        SetStimulatorValueOptions
+% ' Description: Changes the settings of a parameter that is
+% '              currently being used by an ouput.
+% ' Parameters:  outputIndex     - index of the output that the
+% '                                parameter is bound to (the
+% '                                first output has index
+% '                                zero),
+% '              paramId         - id of the parameter,
+% '              minimum         - minumum value for the
+% '                                parameter in the units set
+% '                                by the 'unit' argument,
+% '              maximum         - maxumum value for the
+% '                                parameter in the units set
+% '                                by the 'unit' argument,
+% '              normalIncrement - increment value for the
+% '                                parameter in the units set
+% '                                by the 'unit' argument,
+% '              useLogSlider    - true if this parameter
+% '                                should use a logarithmic
+% '                                scale on the value slider,
+% '              useSteps        - true if the parameter should
+% '                                calculate it's increment
+% '                                value from a number of
+% '                                steps,
+% '              unit            - the unit to use for this
+% '                                parameter (case sensitive)
+% ' 
+% ' Begin SetStimulatorValueOptions
+% outputIndex = 0
+% paramId = ""
+% minimum = 0
+% maximum = 0
+% normalIncrement = 0
+% useLogSlider = False
+% useSteps = False
+% unit = ""
+% Call Doc.SetStimulatorValueOptions (outputIndex, paramId, minimum, maximum, normalIncrement, useLogSlider, useSteps, unit)
+% ' End SetStimulatorValueOptions
+
+
+
+
+
         end
     end
     
 end
 
+%{
+OpenStimulatorDialog - ?
+OpenStimulatorPanel
+SetOutputEnabled_Independent - Sets whether an output is enabed (as opposed to
+'              currently turned on).
+x SetStimulatorDifferential
+SetStimulatorIsolated Select between isolated and analogue outputs.
+'              Only use this macro if a stimulus isolator is
+'              connected and it can be disabled.
+SetStimulatorOn - Change the On/Off state of the output.
+SetStimulatorOutputRangeIndex
+SetStimulatorStartMode - 
+' Description: Sets the stimulator start mode.
+' Parameters:  mode - can be any of the following:
+'                     kStartWhenSamplingStarts,
+'                     kStartManually,
+'                     kStartIndependentlyOfSampling
+SetStimulatorValueOptions
+SetStimulatorValueWholeNumber
+SetStimulatorWaveform
+StimulateNow
+StimulatorStopped - Show independent stimulus stopped message box
+
+
+%}

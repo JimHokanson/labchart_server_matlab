@@ -67,6 +67,10 @@ classdef stimulator < handle
             %   chan : 1 based (default: 'active_chan' property
             %       - 1, first output
             %       - 2, 2nd output
+            %
+            %   GHG: it seems that this is actually 0 based!!
+            %        does not start stimulation, just sets the stimulator
+            %        to the on position
             
             in.chan = obj.active_chan;
             in = labchart.sl.in.processVarargin(in,varargin);
@@ -179,7 +183,10 @@ classdef stimulator < handle
             invoke(obj.h,'SetStimulatorValue',in.chan,'_StartDelay',n_repeats,'',suppress_refresh);
         end
     end
-    
+    methods
+        
+        
+    end
 end
 
 

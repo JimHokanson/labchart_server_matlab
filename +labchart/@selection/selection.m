@@ -3,7 +3,8 @@ classdef selection
     %   Class:
     %   labchart.selection
     %
-    %   Not yet implemented
+    %   Wraps:
+    %   ADIChart.Selection
     
     %{
     Might create a flag indicating whether or not the selection is linked
@@ -24,8 +25,14 @@ classdef selection
     
     %}
     
+    
+    properties
+        
+    end
+    
     properties (Hidden)
        h
+       doc  %labchart.document
     end
     
     properties (Dependent)
@@ -33,26 +40,44 @@ classdef selection
        start_offset
        end_record
        end_offset
+%        chan_range_bottom
+%        chan_range_top
     end
     
     methods
         function value = get.start_record(obj)
-           value = obj.h.SelectionStartRecord; 
+           value = obj.h.SelectionStartRecord + 1; 
         end
         function value = get.start_offset(obj)
            value = obj.h.SelectionStartOffset; 
         end
         function value = get.end_record(obj)
-           value = obj.h.SelectionEndRecord; 
+           value = obj.h.SelectionEndRecord + 1; 
         end
-        function value = get.end_offset(obj)
-           value = obj.h.SelectionEndOffset; 
+       	function value = get.end_offset(obj)
+           value = obj.h.SelectionEndOffset;
         end
+%         function value = get.chan_range_bottom(obj)
+%            
+%         end
+%         function value = get.chan_range_top(obj)
+%             value = obj.h.GetChannelRangeTop; 
+%         end
     end
     
     methods
-        function obj = selection(h)
+        function obj = selection(h,doc)
            obj.h = h; 
+           obj.doc = doc;
+        end
+        function selected = isChannelSelected(obj,chan_index_1b)
+            %
+            %   TODO: document function 
+            %
+            %   
+            
+            %They 0 use based indexing for this function
+            selected = obj.h.IsChannelSelected(chan_index_1b-1);
         end
         function set_channel_range(obj)
             error('Not yet implemented')
@@ -61,6 +86,12 @@ classdef selection
             %channel index, the y-ranges should also probably be in units
             %and not from -1 to 1 (although this would be allowable too
             %with an option
+        end
+        function getMinValueOfSelectedChan(chan_index_1b)
+            %value = obj.h.GetChannelRangeBottom(chan_index_1b-1); 
+        end
+        function getMaxValueOfSelectedChan(chan_index_1b)
+            %value = obj.h.GetChannelRangeBottom(chan_index_1b-1); 
         end
     end
     
