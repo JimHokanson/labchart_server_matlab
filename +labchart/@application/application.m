@@ -1,13 +1,14 @@
 classdef application
     %
     %   Class:
-    %   labchart
+    %   labchart.application
     %
     %   Representatation of the Labchart Application
     %
     %   See Also
     %   --------
     %   labchart.openDocument
+    %   labchart.getActiveDocument
     
     %{
     Other code on GitHub:
@@ -54,6 +55,25 @@ classdef application
         end
     end
     
+    methods (Static)
+        function running = checkIfRunning()
+            %
+            %   running = labchart.application.checkIfRunning()
+            %
+            %   Output
+            %   ------
+            %   running 
+                        
+            p = System.Diagnostics.Process.GetProcessesByName('Labchart8');
+            
+            if p.Length == 0
+                p = System.Diagnostics.Process.GetProcessesByName('Labchart7');
+            end
+            
+            running = p.Length ~= 0;
+        end
+    end
+    
     methods
         function opened_doc = open_document(obj,file_path)
             %
@@ -90,13 +110,24 @@ classdef application
             
             try
                 %Let's reuse if possible, slightly faster
+                %This works if Labchart is running
                 obj.h = actxGetRunningServer('ADIChart.Application');
+                
+                %         message: 'Error using actxGetRunningServer?The 
+                %           server 'ADIChart.Application' is not 
+                %           running on this system.'
+                %      identifier: 'MATLAB:COM:norunningserver'
+                %           stack: [0×1 struct]
+                
+                
             catch ME
                 %I'm not sure why we can't go into the application directly.
                 %Trying to do so hangs the program. I found this example
                 %in the automation example pdf (in the Matlab section)
                 
+                %Note, this line launches 
                 temp = actxserver('ADIChart.Document');
+                
                 obj.h = temp.Application;
                 
                 %Now we have the application reference, close

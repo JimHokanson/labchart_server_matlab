@@ -3,6 +3,8 @@ classdef comments
     %   Class:
     %   labchart.document.comments
     %
+    %   JAH 08/2019 => This class is a work in progress
+    %
     %
     %   Move Comment - no listener in the macro recording
     
@@ -118,7 +120,11 @@ classdef comments
             invoke(obj.h,'SelectComment',index_1b);
 %             obj.h.SelectComment(index_1b);
         end
-        function setCommentText(obj)
+        function setCommentText(obj,index_1b,new_text)
+            %
+            %   Supposedly only works then the comment window
+            %   is open but it worked for me when reviewing a file
+            invoke(obj.h,'SetCommentText',index_1b,new_text)
         end
         function setCommentsViewFilterText(obj)
             invoke(obj.h,'ShowComment',index_1b);

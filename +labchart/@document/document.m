@@ -8,6 +8,11 @@ classdef document < handle
     %   labchart.openDocument()
     %   labchart.getActiveDocument()
     
+    %File naming notes
+    %-----------------
+    %- New documents are named Document#, which increments with
+    %   opening each new document
+    
     %{
     number_of_records
     is_sampling
@@ -51,7 +56,10 @@ classdef document < handle
         %-1 if not sampling
         
         is_sampling
+        
         is_record_mode %???
+        %Saw value of 1 while opening a file not connected to Labchart
+        %
         %TODO: Add more documentation on what this is
         %       "whether in record mode (even if not sampling) rather tha monitor mode"
         %This seems like monitor mode might indicate when it can't connect
@@ -86,8 +94,10 @@ classdef document < handle
         number_of_channels
         number_of_displayed_channels
         channel_names
+        units
     end
     
+    %Dependent methods
     methods
         function value = get.number_of_channels(obj)
             value = obj.h.NumberOfChannels;
@@ -103,6 +113,15 @@ classdef document < handle
                 value{iChan} = local_h.GetChannelName(iChan);
             end
         end
+        function value = get.units(obj)
+            n_chans = obj.number_of_channels;
+            last_record = obj.number_of_records;
+            value = cell(1,n_chans);
+            local_h = obj.h;
+            for iChan = 1:n_chans
+                value{iChan} = local_h.GetUnits(iChan,last_record);
+            end    
+        end
     end
     
     %File Information
@@ -117,6 +136,7 @@ classdef document < handle
         %saved - true if document hasn't changed since last being saved
     end
     
+    %Dependent methods
     methods
         function value = get.name(obj)
             value = obj.h.Name;
@@ -129,6 +149,7 @@ classdef document < handle
         end
     end
     
+    
     properties
         d3 = '--------- Method Containers -------'
         view
@@ -136,6 +157,7 @@ classdef document < handle
         comments
     end
     
+    %Dependent methods
     methods
         function record_obj = getRecord(obj,record_id)
             %TODO: Do a check on validity of id
@@ -143,6 +165,8 @@ classdef document < handle
         end
     end
     
+    %MAIN METHODS
+    %----------------------------------------------------------------------
     methods
         function obj = document(h,app_object)
             obj.h = h;
@@ -151,7 +175,7 @@ classdef document < handle
             %obj.selection = labchart.document.selection(h.SelectionObject,obj);
             obj.view = labchart.document.view(h);
             obj.comments = labchart.document.comments(h);
-
+            
             obj.stimulator = labchart.stim(obj);
             %obj.stimulator = labchart.document.stimulator(h);
         end
@@ -241,7 +265,7 @@ classdef document < handle
             data = obj.h.GetSelectedData(as_double,channel_number_1b);
             
             if in.return_object && exist('sci.time_series.data') %#ok<EXIST>
-                %Yikes, in order to get this to work we need to know what 
+                %Yikes, in order to get this to work we need to know what
                 %the selection is (specifically which block)
                 
                 start_record = obj.selection.start_record;
@@ -251,43 +275,86 @@ classdef document < handle
                 dt = 1/ticks_per_sec;
                 
                 n_samples = length(data);
-            	time_object = sci.time_series.time(dt,n_samples,'sample_offset',sample_offset);
+                time_object = sci.time_series.time(dt,n_samples,'sample_offset',sample_offset);
                 data = sci.time_series.data(data(:),time_object);
                 
             elseif nargout == 2
                 %return a time vector ...
             end
         end
-        function data = getChannelData(obj,channel_number_1b_or_name,block_number_1b,start_sample,n_samples, varargin)
-            % WORK IN PROGRESS!!!!! (GREG)
+        function flag = hasData(obj,channel_number_1b_or_name,block_number_1b)
+            %
+            %   flag = hasData(obj,channel_number_1b_or_name,block_number_1b)
+            %
+            %   Returns whether the channel has samples
+            %    Errors
+            %    ------
+            %    - channel index doesn't exist
+            %    - block number doesn't exist
+            %
+            %    Outputs
+            %    -------
+            %
+            %    Note, I know of no way doing this the "right" way so
+            %    we try to request a single sample of data.
+            %
+            %   Example
+            %   -------
+            %   %Did stim2 record any data for block 1?
+            %   chan_id = 'stim2';
+            %   block_number = 1;
+            %   flag = d.hasData(5,1);
+            
+            temp_data = obj.getChannelData(channel_number_1b_or_name,block_number_1b,1,1,'return_obj',false);
+            flag = ~isnan(temp_data);
+            
+        end
+        function [data,time] = getChannelData(obj,channel_number_1b_or_name,block_number_1b,start_sample, n_samples, varargin)
             %x Returns data from a given channel
             %
-            %   data = d.getChannelData(channel_number_1b_or_name, block_number,start_sample,n_samples, varargin)
+            %   [data,time] = d.getChannelData(channel_number_1b, block_number, start_sample, n_samples, varargin)
             %
-            %   Inputs:
-            %   ---------
-            %   -channel_number_1b_or_name: number or char
+            %   ... = d.getChannelData(channel_name, block_number, start_sample, n_samples, varargin)
+            %
+            %   Inputs specified as time
+            %   ... = d.getChannelData(channel_name, block_number, start_time, duration, 'as_time', true)
+            %
+            %   Usage Quirks
+            %   ------------
+            %   1) Data from all channels are returned at the
+            %   highest sampling rate. Channels that are sampled at
+            %   lower rates will have repeat values (sample and hold).
+            %   2) Requesting data that doesn't exist does not throw
+            %   an error. The only restriction is that the sample # must
+            %   be greater than 1. Non-existant data are returned as NaN
+            %
+            %   Inputs
+            %   ------
+            %   channel_number_1b_or_name : number or string
             %       The channel number or its name in the list of channels
-            %   -block_number: number
+            %   block_number : scalar
             %       The number of the block as it shows up on the display
             %       in LabChart
-            %   -start_sample: number
-            %       The start sample within the chosen block. (start sample
-            %       is 1 referenced)
-            %   -n_samples: number
+            %   start_sample : scalar
+            %       The start sample within the chosen block. The first
+            %       sample is 1.
+            %   n_samples : scalar
             %       number of samples to go from start_sample
-            %   - *return_obj: (default = true)
-            %       if true, returns a sci.time_series.data class
-            %       if false, returns a vector of points
+            %   start_time : scalar
+            %       Time starts from 0
+            %   duration :
+            %       Duration in seconds to return
             %
-            %   TODO: optional inputs
+            %   Optional Inputs
+            %   ---------------
+            %   return_obj : default true
+            %        - true, returns a sci.time_series.data class
+            %        - false, returns a vector of points
+            %   as_time : 
             %
-            %
-            %   Outputs:
-            %   ---------
-            %   - data: 
-            %
-            %   TODO: allow for different output types!
+            %   Output
+            %   ------
+            %   data : sci.time_series.data or array
             %
             %   Example
             %   -------
@@ -297,58 +364,58 @@ classdef document < handle
             %   tps = d.getTicksPerSecond(block_number); %tps - ticks per second
             %   data = d.getChannelData(chan_number,block_number,230*tps,2*tps)
             %
+            %   data = d.getChannelData(chan_number,block_number,0,230,'as_time',true)
+            %
             %   Improvements
             %   See getSelectedData
             
-            
+            in.as_time = false;
             in.return_obj = true;
             in = labchart.sl.in.processVarargin(in,varargin);
             
-            % processing for different input types on channel selection:    
+            % processing for different input types on channel selection:
             if isnumeric(channel_number_1b_or_name)
                 channel_number_1b = channel_number_1b_or_name;
             elseif ischar(channel_number_1b_or_name)
-                channel_number_1b = find(strcmp(channel_number_1b_or_name,obj.channel_names));
-                %TODO: Make this a helper function
-                %
-                %TODO: Support partial matching ...
-                %mask_or_indices = sl.str.findMatches('pres',{'Bladder Pressure','EUS EMG'},'partial_match',true);
-                %mask_or_indices = sl.str.findMatches('pres',{'Bladder ressure','EUS EMG'},'partial_match',true,'n_rule',1);
-                if isempty(channel_number_1b)
-                    error('unable to find  channel match for: %s',channel_number_1b_or_name);
-                elseif length(channel_number_1b) > 1
-                    error('multiple channel matches ...')
-                end
+                channel_number_1b = h__chanNameToIndex(obj,channel_number_1b_or_name);
             else
                 error('Unrecognized input for channel number')
             end
-
-            as_double = 1;
             
-            start_sample = start_sample + (start_sample == 0); 
-            % This is not a good way to deal with this.....
+            if in.as_time
+                tps = obj.getTicksPerSecond(block_number_1b); %tps - ticks per second
+                start_time = start_sample;
+                start_sample = round(start_time*tps)+1;
+                duration = n_samples;
+                n_samples = round(duration*tps);
+            end
             
-            data_vector = obj.h.GetChannelData(as_double,channel_number_1b,block_number_1b,start_sample,n_samples);
+            %The other option is an array of variants ...
+            %Not sure what that is ...
+            AS_DOUBLE = 1;
             
-            if in.return_obj
+            data_vector = obj.h.GetChannelData(...
+                AS_DOUBLE,...
+                channel_number_1b,...
+                block_number_1b,...
+                start_sample,...
+                n_samples);
+            
+            if in.return_obj && ~isempty(which('sci.time_series.data'))
                 tps = obj.getTicksPerSecond(block_number_1b);
                 dt = 1/tps;
-                data = sci.time_series.data(data_vector',dt);  
+                data = sci.time_series.data(data_vector',dt,'y_label',obj.channel_names{channel_number_1b});
             else
-               data = data_vector;
-               %TODO: support output of time vector
+                data = data_vector;
             end
-
-            %Future work??
-            %data = d.h.GetChannelData(1,1,5,230*20000,2*20000)
-            %This is too awkward ...
-            %             in.start_as_samples = [];
-            %             in.duration_as_samples = [];
-            %             in.start_as_time = [];
-            %             in.duration_as_time = [];
-            %             in = labchart.sl.in.processVarargin(in.varargin);
             
-            %GetChannelData(flags As ChannelDataFlags, channelNumber As Long, blockNumber As Long, startSample As Long, numSamples As Long)
+            if nargout == 2
+                tps = obj.getTicksPerSecond(block_number_1b);
+                time = 0:(length(data_vector)-1);
+                time = time.*(1/tps);
+            else
+                time = [];
+            end            
         end
         function addComment(obj,str,channel)
             %
@@ -365,6 +432,13 @@ classdef document < handle
             %   active = labchart.getActiveDocument();
             %   active.addComment('Adding comment to channel 1',1);
             
+            %   TODO: Push this code into comments
+            %
+            %   Note: my current Labchart version only shows:
+            %   - AddCommentAtEnd
+            %   - AddCommentAtInsertionPoint
+            %   - AddCommentAtPositionEx
+            
             if ~exist('channel','var') || isempty(channel)
                 channel = -1;
             end
@@ -379,6 +453,7 @@ classdef document < handle
                 error('Incorrect input types')
             end
             
+            %???? How does this compare to AddCommentAtEnd
             obj.h.AppendComment(str,channel)
         end
         function addCommentAtSelection(obj,str,channel)
@@ -451,7 +526,8 @@ end
 
 function I = h__chanNameToIndex(obj,name)
 
-I = labchart.sl.str.findMatches(name,obj.channel_names,'partial_match',true,'n_rule',1,'multi_result_rule','exact_or_error');
+I = labchart.sl.str.findMatches(name,obj.channel_names,...
+    'partial_match',true,'n_rule',1,'multi_result_rule','exact_or_error');
 
 % % % channel_number_1b = find(strcmp(channel_number_1b_or_char,obj.channel_names));
 % % % %TODO: Make this a helper function
