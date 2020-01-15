@@ -11,7 +11,7 @@ classdef application
     %   labchart.getActiveDocument
     
     %{
-    Other code on GitHub:
+    Other Labchart Server code on GitHub:
     https://github.com/rbute/BCIUI/blob/master/script/LabChartObject.m
     
     %}
@@ -33,6 +33,8 @@ classdef application
             %TODO:
             %Matlab error id when application was closed
             %MATLAB:COM:E0  => Labchart was closed
+            %I think this means I just wanted to provide a more friendly
+            %error message
             
             temp = obj.h.ActiveDocument;
             if isempty(temp)
@@ -60,9 +62,14 @@ classdef application
             %
             %   running = labchart.application.checkIfRunning()
             %
+            %   This can be used to check if Labchart is running without
+            %   actually causing Labchart to open in the process of
+            %   checking.
+            %
             %   Output
             %   ------
-            %   running 
+            %   running : logical
+            %       True when an instance of Labchart is currently open.
                         
             p = System.Diagnostics.Process.GetProcessesByName('Labchart8');
             
@@ -79,7 +86,9 @@ classdef application
             %
             %   opened_doc = open_document(obj,file_path)
             %
-            %   
+            %   Output
+            %   ------
+            %   opened_doc : labchart.document
             
             %Obtain the file path
             %--------------------
@@ -108,6 +117,9 @@ classdef application
             %
             %   This will open up LabChart if it is not already running.
             
+            
+            %This is where the magic begins ...
+            %-----------------------------------
             try
                 %Let's reuse if possible, slightly faster
                 %This works if Labchart is running
@@ -139,7 +151,7 @@ classdef application
             obj.h.CloseActiveDocument();
         end
         function getConfigTabText(tab_name)
-            
+            error('Not yet implemented')
         end
         function delete(obj)
             %Do we need to do something here ....????
