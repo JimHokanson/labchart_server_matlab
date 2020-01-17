@@ -526,8 +526,12 @@ end
 
 function I = h__chanNameToIndex(obj,name)
 
-I = labchart.sl.str.findMatches(name,obj.channel_names,...
-    'partial_match',true,'n_rule',1,'multi_result_rule','exact_or_error');
+if isempty(obj.channel_names)
+    error('No channels available, this happens when data collection has not yet started')
+else
+    I = labchart.sl.str.findMatches(name,obj.channel_names,...
+        'partial_match',true,'n_rule',1,'multi_result_rule','exact_or_error');
+end
 
 % % % channel_number_1b = find(strcmp(channel_number_1b_or_char,obj.channel_names));
 % % % %TODO: Make this a helper function
