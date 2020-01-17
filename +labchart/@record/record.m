@@ -49,47 +49,48 @@ classdef record
             obj.id = record_id;
             obj.lc_id = record_id+1;
         end
-        function data = getChannelData(obj,name_or_index,block_id,varargin)
-            
-            %TODO: Push this down to an instantiated channel object
-            %
-            in.start_sample = 1;
-            in.end_sample = [];
-            in.n_samples = 'all';
-            in = sl.in.processVarargin(in,varargin);
-            
-            %flags, chan #, block#, start_sample, num_samples
-            %flags 
-            %   - 1, doubles
-            %   - 0, variant
-            %chan # - 1 based
-            %block # - 0 based????
-            %start_sample
-            
-            %TickPositionToRecordTime
-            %
-            
-            %??? What happens for an invalid channel # => single NaN value
-            %
-            %Too many samples requested - just returns what it has
-            flags = 0;
-            chan_number = 1;
-            block_number = 6; %1 based
-            start_sample = 1;
-            n_samples = 10*60*1000;
-            
-            %This is returned upsampled as well :/
-            data = obj.h.GetChannelData(flags,chan_number,block_number,start_sample,n_samples);
-            
-            %Time based
-            
-            keyboard;
-            
-            %This function returns the data after upsampling :/
-            %data = obj.h.GetSelectedData(1,1);
-            
-            %obj.h.SetSelectionTime(5,0,5,120)
-        end
+        %This is implemented in the document class
+%         function data = getChannelData(obj,name_or_index,block_id,varargin)
+%             
+%             %TODO: Push this down to an instantiated channel object
+%             %
+%             in.start_sample = 1;
+%             in.end_sample = [];
+%             in.n_samples = 'all';
+%             in = sl.in.processVarargin(in,varargin);
+%             
+%             %flags, chan #, block#, start_sample, num_samples
+%             %flags 
+%             %   - 1, doubles
+%             %   - 0, variant
+%             %chan # - 1 based
+%             %block # - 0 based????
+%             %start_sample
+%             
+%             %TickPositionToRecordTime
+%             %
+%             
+%             %??? What happens for an invalid channel # => single NaN value
+%             %
+%             %Too many samples requested - just returns what it has
+%             flags = 0;
+%             chan_number = 1;
+%             block_number = 6; %1 based
+%             start_sample = 1;
+%             n_samples = 10*60*1000;
+%             
+%             %This is returned upsampled as well :/
+%             data = obj.h.GetChannelData(flags,chan_number,block_number,start_sample,n_samples);
+%             
+%             %Time based
+%             
+%             keyboard;
+%             
+%             %This function returns the data after upsampling :/
+%             %data = obj.h.GetSelectedData(1,1);
+%             
+%             %obj.h.SetSelectionTime(5,0,5,120)
+%         end
     end
     
 end

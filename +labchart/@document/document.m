@@ -64,6 +64,8 @@ classdef document < handle
         %       "whether in record mode (even if not sampling) rather tha monitor mode"
         %This seems like monitor mode might indicate when it can't connect
         %with the hardware
+        
+        event_listeners
     end
     methods
         function value = get.number_of_records(obj)
@@ -82,6 +84,9 @@ classdef document < handle
         end
         function value = get.is_record_mode(obj)
             value = obj.h.IsRecordMode;
+        end
+        function value = get.event_listeners(obj)
+            value = obj.h.eventlisteners; 
         end
     end
     
@@ -179,6 +184,70 @@ classdef document < handle
             obj.stimulator = labchart.stim(obj);
             %obj.stimulator = labchart.document.stimulator(h);
         end
+        function delete(obj)
+            %disp('Disconnecting document from Labchart')
+            if ~isempty(obj.event_listeners)
+                obj.unregisterAllEvents();
+            end
+            obj.h.release()
+        end
+        function unregisterAllEvents(obj)
+            if ~isempty(obj.event_listeners)
+                obj.h.unregisterallevents(); 
+            end
+        end
+        function registerSelectionChangeCallback(obj,callback_fh)
+            obj.h.registerevent({'OnSelectionChange',callback_fh})
+        end
+        function registerOnNewSamplesCallback(obj,callback_fh)
+            %
+            %   Callback returns 5 inputs:
+            %   ---------------------------
+            %   1) Interface : it looks like this is a pointer to the
+            %   record that just stopped? Methods calls fail ...
+            %   2) EventID : 3
+            %   3) struct, containing fields:
+            %       - 'Type' - 'OnNewSamples'
+            %       - 'Source' [1×1 Interface.9A74BBA2_5C34_4231_9275_3E7E24A042B8]
+            %       - 'EventID' - 3 
+            %       - newTicks: 1000
+            %   4) Type : 'OnStartSamplingBlock'
+            obj.h.registerevent({'OnNewSamples',callback_fh})
+        end
+        function registerBlockStartCallback(obj,callback_fh)
+            %
+            %   Note, execution of this callback blocks Labchart
+            %   visualization (data collection still happening)
+            %
+            %   Callback returns 4 inputs:
+            %   ---------------------------
+            %   1) Interface : it looks like this is a pointer to the
+            %   record that just stopped? Methods calls fail ...
+            %   2) EventID : 
+            %   3) struct, containing fields:
+            %       - 'Type' - 'OnStartSamplingBlock'
+            %       - 'Source' [1×1 Interface.9A74BBA2_5C34_4231_9275_3E7E24A042B8]
+            %       - 'EventID' - 2 
+            %       - 
+            %   4) Type : 'OnStartSamplingBlock'
+            obj.h.registerevent({'OnStartSamplingBlock',callback_fh})
+        end
+        function registerBlockEndCallback(obj,callback_fh)
+            %
+            %   Callback returns 4 inputs:
+            %   ---------------------------
+            %   1) Interface : it looks like this is a pointer to the
+            %   record that just stopped? Methods calls fail ...
+            %   2) EventID : 
+            %   3) struct, containing fields:
+            %       - 'Type' - 'OnFinishSamplingBlock'
+            %       - 'Source' [1×1 Interface.9A74BBA2_5C34_4231_9275_3E7E24A042B8]
+            %       - 'EventID' - 4 
+            %       - 
+            %   4) Type : 'OnFinishSamplingBlock'
+            
+            obj.h.registerevent({'OnFinishSamplingBlock',callback_fh})
+        end
         function n_ticks = getRecordLengthInTicks(obj,block_number_1b)
             n_ticks = obj.h.GetRecordLength(block_number_1b-1);
         end
@@ -222,6 +291,7 @@ classdef document < handle
             %   Optional Inputs
             %   ---------------
             %   return_object : (default true)
+            %       This only works if Jim's standdard library is installed
             %   n_decimate : (default 1)
             %       Not yet implemented. Currently everything is returned
             %       at a tick rate instead of its real sampling rate.
@@ -309,11 +379,13 @@ classdef document < handle
             flag = ~isnan(temp_data);
             
         end
-        function [data,time] = getChannelData(obj,channel_number_1b_or_name,block_number_1b,start_sample, n_samples, varargin)
+        function [data,time] = getChannelData(obj,channel_number_1b_or_name, ...
+                        block_number_1b,start_sample, n_samples, varargin)
             %x Returns data from a given channel
             %
             %   [data,time] = d.getChannelData(channel_number_1b, block_number, start_sample, n_samples, varargin)
             %
+            %   Channel Name instead of number
             %   ... = d.getChannelData(channel_name, block_number, start_sample, n_samples, varargin)
             %
             %   Inputs specified as time
@@ -339,7 +411,8 @@ classdef document < handle
             %       The start sample within the chosen block. The first
             %       sample is 1.
             %   n_samples : scalar
-            %       number of samples to go from start_sample
+            %       number of samples to go from start_sample. Apparently
+            %       -1 gives you everything ...
             %   start_time : scalar
             %       Time starts from 0
             %   duration :
@@ -349,8 +422,11 @@ classdef document < handle
             %   ---------------
             %   return_obj : default true
             %        - true, returns a sci.time_series.data class
+            %                This relies on having Jim's Matlab Standard 
+            %                library on the path
             %        - false, returns a vector of points
-            %   as_time : 
+            %   as_time : default false
+            %       
             %
             %   Output
             %   ------
@@ -402,6 +478,8 @@ classdef document < handle
                 n_samples);
             
             if in.return_obj && ~isempty(which('sci.time_series.data'))
+                %Note, this requires Jims Matlab Standard Library
+                %   https://github.com/JimHokanson/matlab_standard_library
                 tps = obj.getTicksPerSecond(block_number_1b);
                 dt = 1/tps;
                 data = sci.time_series.data(data_vector',dt,'y_label',obj.channel_names{channel_number_1b});
@@ -523,6 +601,11 @@ classdef document < handle
         
     end
 end
+
+
+%         doc.unregisterallevents
+%     end
+%     doc.release
 
 function I = h__chanNameToIndex(obj,name)
 
@@ -661,3 +744,9 @@ saveobj
 set
 
 %}
+
+% Record data
+% %off
+% invoke(d.h,'PlayMessage','0x0400000001000000FFFFFFFF01000000FFFFFFFFFD1A0000AAAA1455010000000400FF7F904BA734BC0DD311B870008048C36FE8000000003200FF7F4002D1870D0FD311B871008048C36FE8000000000000000008000000')
+% %on
+% invoke(d.h,'PlayMessage','0x0400000001000000FFFFFFFF01000000FFFFFFFFFE1A0000AAAA1455010000000400FF7F904BA734BC0DD311B870008048C36FE8000000003200FF7F4002D1870D0FD311B871008048C36FE8000000000100000008000000')
