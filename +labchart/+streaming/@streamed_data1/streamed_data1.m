@@ -16,7 +16,7 @@ classdef streamed_data1 < handle
     %   ----------------
     %
     %   
-    %          |------------------------------------| <= buffer
+    %          |------------------------------------|    <= buffer
     %                     . <= pointer to last valid index
     %   Time 1: xxxxxxxxxxx   <= data points
     %     ...                               (345 data as well)
@@ -42,7 +42,8 @@ classdef streamed_data1 < handle
     %
     %   Improvements
     %   ------------
-    %   1) Support downsampling further ...
+    %   1) Support downsampling beyond simply removing the sample and hold 
+    %      data.
     
     properties
         data
@@ -63,9 +64,10 @@ classdef streamed_data1 < handle
         %See documentation in the constructor for these ...
         axis_width_seconds
         auto_detect_record_change
-        buffer_muliplier %How big to make the buffer relative to the amount
-        %of data we want to ensure is always valid ...
-        h_axes %Handle to an axes object for plotting into
+        buffer_muliplier
+        callback
+        callback_only_when_ready
+        h_axes
         plot_options
         new_data_processor
         remove_sample_hold 
@@ -125,8 +127,52 @@ classdef streamed_data1 < handle
             %
             %   Optional Inputs
             %   ---------------
-            %   auto_detect_record_change
+            %   auto_detect_record_change : default true
+            %       If true, changes in record will automatically
+            %       reinitialize this class. Generally this should be left
+            %       true ...
+            %   axis_width_seconds : default []
+            %       If specified this will update the range of the x-axis
+            %       so that it spans the spcecified width.
+            %   buffer_muliplier : default 10
+            %       How big to make the buffer relative to the amount
+            %       of data we want to ensure is always valid. Once the
+            %       buffer is about to overflow we move the necessary
+            %       amount of data to the front of the buffer. Thus this
+            %       parameter is a speed/memory tradeoff; smaller means
+            %       more moving memory around, larger means slightly faster
+            %       performance but more overall memory usage. This also
+            %       impacts how much data are retained when plotting (if
+            %       h_axes is specified).
+            %   callback : default []
+            %       If specified this will be called after the internal
+            %       buffer has been updated with the newest data.The 
+            %       format should be:
             %
+            %           <function_name>(streaming_obj,doc)
+            %               - streaming_obj - this class
+            %               - doc - handle to the Labchart document
+            %                       labchart.document
+            %
+            %
+            %   callback_only_when_ready : default true
+            %   h_axes : handle to Axes object
+            %       If specified, the buffer will be plotted to the
+            %       specified axes object as new data are acquired. The
+            %       underlying implementation uses animatedline() with a
+            %       maximum size set to the size of the buffer.
+            %   new_data_processor : callback
+            %       If passed in, this callback receives new data and
+            %       should return processed data. This can be used to
+            %       filter data as it is acquired. Format must be:
+            %           
+            %           data_out = <function_name>(data_in,is_first_call)
+            %
+            %       Note that 'is_first_call' is true when the underlying
+            %       buffer has just been initialized (or re-initialized).
+            %   plot_options : cell
+            %       Pass this in to control properties of plotting. For
+            %       example you could pass in {'color','r'}
             %   remove_sample_hold : (default true)
             %       If true, replication due to sample & hold is removed. 
             %       All channels except the highest rate channel will
@@ -135,6 +181,12 @@ classdef streamed_data1 < handle
             %       example if we sample at 10Hz but our highest rate is
             %       100 Hz by default we'll get 100Hz data with changes
             %       every 10th sample
+            %   remove_sample_hold : (default true)
+            %       If true, redundant samples from holding will be
+            %       removed so that the sampling rate becomes the specified
+            %       sampling rate. If false, the sampling rate is
+            %       equivalent to the highest sampling rate being used in
+            %       the file.
             %
             %   Example
             %   -------
@@ -144,12 +196,13 @@ classdef streamed_data1 < handle
             %   n_seconds_valid = 10;
             %   s1 = labchart.streaming.streamed_data1(fs,n_seconds_valid,name,...
             %       'h_axes',gca,'plot_options',{'Color','r'});
-            %   fh = @(~,~,~,~,~)labchart.callbacks.newDataStreamingExample1(d,s1);
-            %   d.registerOnNewSamplesCallback(fh);
+            %   s1.register(d);
             
             in.auto_detect_record_change = true;
             in.axis_width_seconds = [];
             in.buffer_muliplier = 10;
+            in.callback = [];
+            in.callback_only_when_ready = true;
             in.h_axes = [];
             in.new_data_processor = [];
             in.plot_options = {};
@@ -171,200 +224,25 @@ classdef streamed_data1 < handle
                 in.buffer_multiplier = 1.1;
             end
             obj.buffer_muliplier = in.buffer_muliplier;
+            obj.callback = in.callback;
+            obj.callback_only_when_ready = in.callback_only_when_ready;
             
             obj.h_axes = in.h_axes;
             obj.new_data_processor = in.new_data_processor;
             obj.plot_options = in.plot_options;
             obj.remove_sample_hold = in.remove_sample_hold;
         end
-        function addData(obj,h_doc)
+        %TODO: Can we do a specific unregister call?
+        %       - in other words, currently the only unregister we call
+        %       is for everything, can we be more precise?
+        %TODO: What happens if we register twice???
+        function register(h_doc)
             %
-            %   Inputs
-            %   ------
-            %   h_doc : labchart.document
-            
-            %Note, we wrap everything in a try/catch so that
-            %if this is broken it only throws 1 error then
-            %stops ...
-                        
-            try
-                if ~obj.error_thrown
-                    obj.n_add_data_calls = obj.n_add_data_calls + 1;
-                    h_tic = tic;
-                    
-                    %This makes it easier for the user to use ...
-                    if obj.auto_detect_record_change
-                        if h_doc.current_record ~= obj.current_record
-                            obj.block_initialized = false;
-                        end
-                    end
-                    
-                    if ~obj.block_initialized
-                        is_init_call = true;
-                        obj.block_initialized = true;
-                        obj.h_tic_start = tic;
-                        obj.current_record = h_doc.current_record;
-                        obj.ticks_per_second = 1/h_doc.getSecondsPerTick(obj.current_record);
-                        
-                        %name resolution
-                        %--------------------------------
-                        if ischar(obj.chan_index_or_name)
-                            I = find(strcmpi(h_doc.channel_names,obj.chan_index_or_name));
-                            if isempty(I)
-                                error('unable to find specified channel for streaming')
-                            end
-                            obj.chan_index = I;
-                        end
-                        
-                        %step/hold options
-                        %--------------------------------------------------
-                        if obj.remove_sample_hold
-                            %verify decimation amount
-                            temp = obj.ticks_per_second/obj.fs;
-                            if temp ~= round(temp)
-                                %Basically this means the user specified
-                                %fs wrong because
-                                error('unable to find valid decimation step size')
-                            end
-                            obj.decimation_step_size = temp;
-                            obj.data_dt = 1/obj.fs;
-                        else
-                            obj.decimation_step_size = 1;
-                            obj.data_dt = 1/obj.ticks_per_second;
-                        end
-                        
-                        %Buffer initialization
-                        %--------------------------------------------------
-                        obj.n_samples_keep_valid = ceil(obj.n_seconds_keep_valid/obj.data_dt);
-                        obj.buffer_size = ceil(obj.n_samples_keep_valid*obj.buffer_muliplier);
-                        obj.data = zeros(1,obj.buffer_size);
-                        obj.last_valid_I = 0;
-                        
-                        %Plotting
-                        %------------------------------------
-                        if isvalid(obj.h_axes)
-                            obj.h_line = animatedline(...
-                                'MaximumNumPoints',obj.buffer_size,...
-                                'Parent',obj.h_axes,...
-                                obj.plot_options{:});
-                        end
-                        
-                        %Where are we in time??? - how far back do we go???
-                        %------------------------------------------------------
-                        n_ticks_current_record = h_doc.getRecordLengthInTicks(obj.current_record);
-                        n_samples_available = n_ticks_current_record/obj.decimation_step_size;
-                        
-                        if n_samples_available > obj.n_samples_keep_valid
-                            n_samples_grab = obj.n_samples_keep_valid*obj.decimation_step_size;
-                            start_I = n_ticks_current_record-n_samples_grab+1;
-                        else
-                            n_samples_grab = n_ticks_current_record;
-                            start_I = 1;
-                        end
-                        new_data = h__getData(h_doc,obj,start_I,n_samples_grab);
-                    else %already initialized
-                        is_init_call = false;
-                        new_data = h__getData(h_doc,obj,obj.last_grab_end+1,-1);
-                        
-                        I2 = obj.callback_times_I;
-                        if I2 == 100
-                            I2 = 1;
-                        else
-                            I2 = I2 + 1;
-                        end
-                        obj.callback_times(I2) = toc(obj.h_tic_start);
-                        obj.callback_times_I = I2;
-                    end
-                    
-                    %At this point we are initialized and have 'new_data'
-                    %as well as an updated state
-                    
-                    %Remove held samples ...
-                    %-------------------------------------------
-                    if obj.decimation_step_size ~= 1
-                        new_data = new_data(1:obj.decimation_step_size:end);
-                    end
-                    
-                    %Processing
-                    %----------------------------------------------------------
-                    %   Example: labchart.streaming.processors.butterworth_filter
-                    
-                    %NOTE: Due to use of data_dt we can't downsample here
-                    %... Eventually we should support this ...
-                    if ~isempty(obj.new_data_processor)
-                        new_data = obj.new_data_processor(new_data,is_init_call);
-                    end
-                    
-                    %Plotting
-                    %----------------------------------------------------------
-                    if isvalid(obj.h_line)
-                        x1 = obj.last_grab_start/obj.ticks_per_second;
-                        x2 = obj.last_grab_end/obj.ticks_per_second;
-                        x = x1:obj.data_dt:x2;
-                        addpoints(obj.h_line,x,new_data);
-                        if ~isempty(obj.axis_width_seconds)
-                            set(obj.h_axes,'xlim',[x2-obj.axis_width_seconds x2])
-                        end
-                    end
-                    
-                    %Adding data to buffer for analysis
-                    %----------------------------------------------------------
-                    if length(new_data) > obj.n_samples_keep_valid
-                        obj.data = new_data(end-obj.n_samples_keep_valid+1:end);
-                        obj.last_valid_I = length(obj.data);
-                    elseif length(new_data) + obj.last_valid_I > obj.buffer_size
-                        %Example:
-                        %keep 20 valid
-                        %95 - last_valid_I
-                        %we now have 13 new samples
-                        %
-                        %   13 new samples go in from 20-13+1 to 20
-                        %
-                        start1 = obj.n_samples_keep_valid-length(new_data)+1;
-                        end1 = obj.n_samples_keep_valid;
-                        %don't want to pollute data before shuffling
-                        %obj.data(start1:end1) = new_data;
-                        
-                        %
-                        %   We still need 7 samples, grab from 95 backwards
-                        %           95-n_samples_grab+1:95
-                        %
-                        n_samples_grab = obj.n_samples_keep_valid-length(new_data);
-                        start2 = obj.last_valid_I-n_samples_grab+1;
-                        end2 = obj.last_valid_I;
-                        
-                        obj.data(1:n_samples_grab) = obj.data(start2:end2);
-                        %do this after internal shuffling;
-                        obj.data(start1:end1) = new_data;
-                        
-                        obj.last_valid_I = obj.n_samples_keep_valid;
-                    else
-                        start_I = obj.last_valid_I+1;
-                        end_I = obj.last_valid_I+length(new_data);
-                        obj.data(start_I:end_I) = new_data;
-                        obj.last_valid_I = end_I;
-                    end
-                    
-                    obj.n_seconds_valid = obj.last_valid_I*obj.data_dt;
-                    
-                    I2 = obj.add_data_times_I;
-                    if I2 == 100
-                        I2 = 1;
-                    else
-                        I2 = I2 + 1;
-                    end
-                    obj.add_data_times(I2) = toc(h_tic);
-                    obj.add_data_times_I = I2;
-                end
-            catch ME
-                if ~obj.error_thrown
-                    obj.error_thrown = true; %Only throw this once
-                    fprintf(2,'error in addData callback, see debug_ME variable in base workspace\n')
-                    assignin('base','debug_ME',ME)
-                    assignin('base','debug_streaming',obj)
-                end
-            end
+            %   Makes it so that on new samples we add them to the class
+            fh = @(varargin)obj.addData(h_doc);
+            h_doc.registerOnNewSamplesCallback(fh);
         end
+        
         function user_data = getData(obj)
             last_I = obj.last_valid_I;
             n_valid_goal = obj.n_samples_keep_valid;
@@ -376,25 +254,9 @@ classdef streamed_data1 < handle
         end
         function reset(obj)
             obj.block_initialized = false;
+            obj.error_thrown = false;
         end
     end
 end
 
-function data_vector = h__getData(doc,obj,start_I,n_samples)
-AS_DOUBLE = 1;
-channel_number_1b = obj.chan_index;
-block_number_1b = obj.current_record;
 
-data_vector = doc.h.GetChannelData(...
-    AS_DOUBLE,...
-    channel_number_1b,...
-    block_number_1b,...
-    start_I,...
-    n_samples);
-
-obj.last_grab_start = start_I;
-n_samples2 = length(data_vector);
-%TODO: validate length is what we expect if n_samples is not -1
-%-1 means grab all
-obj.last_grab_end = start_I + n_samples2-1;
-end

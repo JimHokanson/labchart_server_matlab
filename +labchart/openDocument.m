@@ -3,8 +3,14 @@ function doc = openDocument(file_path)
 %
 %   doc = labchart.openDocument(file_path)
 %
-%   TODO: Implement this:
-%   https://forum.adinstruments.com/viewtopic.php?f=7&t=782&p=2270#p2270
+%   Inputs
+%   ------
+%   file_path : string
+%       Path of the file to open.
+%
+%   Outputs
+%   -------
+%   doc : labchart.document
 
 app = labchart.application;
 active_doc = app.active_document;

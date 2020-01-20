@@ -86,7 +86,7 @@ classdef document < handle
             value = obj.h.IsRecordMode;
         end
         function value = get.event_listeners(obj)
-            value = obj.h.eventlisteners; 
+            value = obj.h.eventlisteners;
         end
     end
     
@@ -125,7 +125,7 @@ classdef document < handle
             local_h = obj.h;
             for iChan = 1:n_chans
                 value{iChan} = local_h.GetUnits(iChan,last_record);
-            end    
+            end
         end
     end
     
@@ -193,7 +193,7 @@ classdef document < handle
         end
         function unregisterAllEvents(obj)
             if ~isempty(obj.event_listeners)
-                obj.h.unregisterallevents(); 
+                obj.h.unregisterallevents();
             end
         end
         function registerSelectionChangeCallback(obj,callback_fh)
@@ -209,9 +209,14 @@ classdef document < handle
             %   3) struct, containing fields:
             %       - 'Type' - 'OnNewSamples'
             %       - 'Source' [1×1 Interface.9A74BBA2_5C34_4231_9275_3E7E24A042B8]
-            %       - 'EventID' - 3 
+            %       - 'EventID' - 3
             %       - newTicks: 1000
             %   4) Type : 'OnStartSamplingBlock'
+            %
+            %   See Also
+            %   --------
+            %   labchart.callbacks
+            
             obj.h.registerevent({'OnNewSamples',callback_fh})
         end
         function registerBlockStartCallback(obj,callback_fh)
@@ -223,13 +228,18 @@ classdef document < handle
             %   ---------------------------
             %   1) Interface : it looks like this is a pointer to the
             %   record that just stopped? Methods calls fail ...
-            %   2) EventID : 
+            %   2) EventID :
             %   3) struct, containing fields:
             %       - 'Type' - 'OnStartSamplingBlock'
             %       - 'Source' [1×1 Interface.9A74BBA2_5C34_4231_9275_3E7E24A042B8]
-            %       - 'EventID' - 2 
-            %       - 
+            %       - 'EventID' - 2
+            %       -
             %   4) Type : 'OnStartSamplingBlock'
+            %
+            %   See Also
+            %   --------
+            %   labchart.callbacks
+            
             obj.h.registerevent({'OnStartSamplingBlock',callback_fh})
         end
         function registerBlockEndCallback(obj,callback_fh)
@@ -238,13 +248,17 @@ classdef document < handle
             %   ---------------------------
             %   1) Interface : it looks like this is a pointer to the
             %   record that just stopped? Methods calls fail ...
-            %   2) EventID : 
+            %   2) EventID :
             %   3) struct, containing fields:
             %       - 'Type' - 'OnFinishSamplingBlock'
             %       - 'Source' [1×1 Interface.9A74BBA2_5C34_4231_9275_3E7E24A042B8]
-            %       - 'EventID' - 4 
-            %       - 
+            %       - 'EventID' - 4
+            %       -
             %   4) Type : 'OnFinishSamplingBlock'
+            %
+            %   See Also
+            %   --------
+            %   labchart.callbacks
             
             obj.h.registerevent({'OnFinishSamplingBlock',callback_fh})
         end
@@ -331,6 +345,7 @@ classdef document < handle
             end
             
             as_double = 1;
+            
             %This function uses 1 based channel indexing, not zero!
             data = obj.h.GetSelectedData(as_double,channel_number_1b);
             
@@ -350,37 +365,61 @@ classdef document < handle
                 
             elseif nargout == 2
                 %return a time vector ...
+                error('Not yet implemented')
             end
         end
         function flag = hasData(obj,channel_number_1b_or_name,block_number_1b)
             %
-            %   flag = hasData(obj,channel_number_1b_or_name,block_number_1b)
+            %   flag = hasData(obj,channel_name,block_number)
             %
-            %   Returns whether the channel has samples
-            %    Errors
-            %    ------
-            %    - channel index doesn't exist
-            %    - block number doesn't exist
+            %   flag = hasData(obj,channel_number,block_number)
             %
-            %    Outputs
-            %    -------
+            %   Returns whether the channel has samples. Note, I know of 
+            %   no way doing this the "right" way so we try to request a 
+            %   single sample of data. Labchart returns NaN when invalid 
+            %   data requests are made (as long as the channel and block
+            %   exist).
             %
-            %    Note, I know of no way doing this the "right" way so
-            %    we try to request a single sample of data.
+            %   Inputs
+            %   ------
+            %   channel_name : string
+            %       Name of the channel.
+            %   channel_number : 1 based
+            %   block_number : 1 based
+            %
+            %   Possible Errors
+            %   ---------------
+            %   - channel index doesn't exist
+            %   - block number doesn't exist
+            %
+            %   Note, the channel not having any data is not an error
+            %
+            %   Outputs
+            %   -------
+            %   flag : logical
+            %       Whether any data has been collected for that channel
+            %       for that record.
+            %    
             %
             %   Example
             %   -------
             %   %Did stim2 record any data for block 1?
-            %   chan_id = 'stim2';
+            %   chan_index = 5;
             %   block_number = 1;
-            %   flag = d.hasData(5,1);
+            %   flag = doc.hasData(chan_index,block_number);
+            %
+            %   %Alternatively ...
+            %   flag = doc.hasData('stim2',block_number);
             
-            temp_data = obj.getChannelData(channel_number_1b_or_name,block_number_1b,1,1,'return_obj',false);
+            temp_data = obj.getChannelData(channel_number_1b_or_name,...
+                block_number_1b,1,1,'return_obj',false);
             flag = ~isnan(temp_data);
             
         end
-        function [data,time] = getChannelData(obj,channel_number_1b_or_name, ...
-                        block_number_1b,start_sample, n_samples, varargin)
+        function [data,time] = getChannelData(obj,...
+                    channel_number_1b_or_name, ...
+                    block_number_1b,...
+                    start_sample, n_samples, varargin)
             %x Returns data from a given channel
             %
             %   [data,time] = d.getChannelData(channel_number_1b, block_number, start_sample, n_samples, varargin)
@@ -422,15 +461,17 @@ classdef document < handle
             %   ---------------
             %   return_obj : default true
             %        - true, returns a sci.time_series.data class
-            %                This relies on having Jim's Matlab Standard 
+            %                This relies on having Jim's Matlab Standard
             %                library on the path
             %        - false, returns a vector of points
             %   as_time : default false
-            %       
+            %
             %
             %   Output
             %   ------
-            %   data : sci.time_series.data or array
+            %   data : sci.time_series.data or numeric array
+            %       Note sci.time_series.data requires an additional
+            %       library.
             %
             %   Example
             %   -------
@@ -493,14 +534,14 @@ classdef document < handle
                 time = time.*(1/tps);
             else
                 time = [];
-            end            
+            end
         end
         function addComment(obj,str,channel)
             %
-            %   addComment(obj,str, *channel)
+            %   addComment(obj,str,*channel)
             %
             %   Inputs
-            %   -------
+            %   ------
             %   channel : (default -1)
             %       -1 applies the comment to all channels
             %   	#s are 1 based
@@ -536,10 +577,20 @@ classdef document < handle
         end
         function addCommentAtSelection(obj,str,channel)
             %
+            %   addCommentAtSelection(obj,str,*channel)
+            %
             %   For wide selections the comment is added halfway through
             %   the document ?? - not halfway at the selection?
             %   I guess it is unclear what this means when crossing
             %   blocks with differnt sampling rates - halfway by ticks?
+            %
+            %   Inputs
+            %   ------
+            %   str : string
+            %       Comment to add
+            %   channel : scalar, 1 based, default -1
+            %       Channel # to add the comment to. -1 indicates the
+            %       comment should be added to all channels.
             
             if ~exist('channel','var') || isempty(channel)
                 channel = -1;
@@ -560,6 +611,7 @@ classdef document < handle
             %SelectChannel(channel As Long, select As Boolean)
         end
         function setSelectionTime(obj)
+            error('Not yet implemented')
             %SetSelectionTime
             obj.h.SetSelectionTime(start_block,start_offset,end_block,end_offset)
             %d.h.SetSelectionTime(4,10,4,20)
