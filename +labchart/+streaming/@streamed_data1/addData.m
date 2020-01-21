@@ -115,7 +115,8 @@ try
         %NOTE: Due to use of data_dt we can't downsample here
         %... Eventually we should support this ...
         if ~isempty(obj.new_data_processor)
-            new_data = obj.new_data_processor(new_data,is_init_call);
+            temp_data = new_data; %for debugging
+            new_data = obj.new_data_processor(temp_data,is_init_call);
         end
         
         %Plotting
@@ -136,6 +137,7 @@ try
             obj.data = new_data(end-obj.n_samples_keep_valid+1:end);
             obj.last_valid_I = length(obj.data);
         elseif length(new_data) + obj.last_valid_I > obj.buffer_size
+            obj.n_buffer_resets = obj.n_buffer_resets + 1;
             %Example:
             %keep 20 valid
             %95 - last_valid_I
@@ -162,6 +164,7 @@ try
             
             obj.last_valid_I = obj.n_samples_keep_valid;
         else
+            obj.n_simple_adds = obj.n_simple_adds + 1;
             start_I = obj.last_valid_I+1;
             end_I = obj.last_valid_I+length(new_data);
             obj.data(start_I:end_I) = new_data;
@@ -197,6 +200,7 @@ catch ME
         fprintf(2,'error in addData callback, see debug_ME variable in base workspace\n')
         assignin('base','debug_ME',ME)
         assignin('base','debug_streaming',obj)
+        obj.error_ME = ME;
     end
 end
 end
