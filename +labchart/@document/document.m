@@ -523,7 +523,9 @@ classdef document < handle
                 %   https://github.com/JimHokanson/matlab_standard_library
                 tps = obj.getTicksPerSecond(block_number_1b);
                 dt = 1/tps;
-                data = sci.time_series.data(data_vector',dt,'y_label',obj.channel_names{channel_number_1b});
+                data = sci.time_series.data(data_vector',dt,...
+                    'y_label',obj.channel_names{channel_number_1b},...
+                    'units',obj.units{channel_number_1b});
             else
                 data = data_vector;
             end
