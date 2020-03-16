@@ -10,15 +10,31 @@ function addData(obj,h_doc)
 
 try
     if ~obj.error_thrown
+        
+        
+        %Performance Logging
+        %------------------------------------------------
         obj.n_add_data_calls = obj.n_add_data_calls + 1;
-        h_tic = tic;
+        
+        obj.perf_I = obj.perf_I + 1;
+        if obj.perf_I > 100
+            obj.perf_I = 1;
+        end
+
+        if ~isempty(obj.h_tic_start)
+            obj.ms_since_last_callback(obj.perf_I) = 1000*(toc(obj.h_tic_start));
+        end
+        
+        obj.h_tic_start = tic;
         
         %Record change handling
         %----------------------
         %This makes it easier for the user to use ...
         if obj.auto_detect_record_change
+            %This fails periodically, why????????
+            %What do we want to do in this case ????
             if h_doc.current_record ~= obj.current_record
-                obj.block_initialized = false;
+                obj.reset();
             end
         end
         
@@ -88,16 +104,9 @@ try
         else %already initialized
             is_init_call = false;
             new_data = h__getData(h_doc,obj,obj.last_grab_end+1,-1);
-            
-            I2 = obj.callback_times_I;
-            if I2 == 100
-                I2 = 1;
-            else
-                I2 = I2 + 1;
-            end
-            obj.callback_times(I2) = toc(obj.h_tic_start);
-            obj.callback_times_I = I2;
         end
+        
+        %if 
         
         %At this point we are initialized and have 'new_data'
         %as well as an updated state
@@ -108,14 +117,18 @@ try
             new_data = new_data(1:obj.decimation_step_size:end);
         end
         
-        %Processing
+        obj.n_samples_added(obj.perf_I) = length(new_data);
+        
+        %Processing before plotting
         %----------------------------------------------------------
         %   Example: labchart.streaming.processors.butterworth_filter
         
-        %NOTE: Due to use of data_dt we can't downsample here
+        %NOTE: Due to use of data_dt we can't downsample here (otherwise we
+        %would need to support updating the data_dt property)
         %... Eventually we should support this ...
         if ~isempty(obj.new_data_processor)
-            new_data = obj.new_data_processor(new_data,is_init_call);
+            temp_data = new_data; %for debugging
+            new_data = obj.new_data_processor(temp_data,is_init_call);
         end
         
         %Plotting
@@ -130,12 +143,20 @@ try
             end
         end
         
+        %Processing after plotting
+        %----------------------------------------------------------
+        if ~isempty(obj.new_data_processor2)
+            temp_data = new_data; %for debugging
+            new_data = obj.new_data_processor2(temp_data,is_init_call);
+        end
+        
         %Adding data to buffer for analysis
         %----------------------------------------------------------
         if length(new_data) > obj.n_samples_keep_valid
             obj.data = new_data(end-obj.n_samples_keep_valid+1:end);
             obj.last_valid_I = length(obj.data);
         elseif length(new_data) + obj.last_valid_I > obj.buffer_size
+            obj.n_buffer_resets = obj.n_buffer_resets + 1;
             %Example:
             %keep 20 valid
             %95 - last_valid_I
@@ -162,6 +183,7 @@ try
             
             obj.last_valid_I = obj.n_samples_keep_valid;
         else
+            obj.n_simple_adds = obj.n_simple_adds + 1;
             start_I = obj.last_valid_I+1;
             end_I = obj.last_valid_I+length(new_data);
             obj.data(start_I:end_I) = new_data;
@@ -179,17 +201,9 @@ try
             end
         end
         
-        
         %Performance logging
         %-------------------
-        I2 = obj.add_data_times_I;
-        if I2 == 100
-            I2 = 1;
-        else
-            I2 = I2 + 1;
-        end
-        obj.add_data_times(I2) = toc(h_tic);
-        obj.add_data_times_I = I2;
+        obj.ms_per_callback(obj.perf_I) = 1000*toc(obj.h_tic_start);
     end
 catch ME
     if ~obj.error_thrown
@@ -197,6 +211,7 @@ catch ME
         fprintf(2,'error in addData callback, see debug_ME variable in base workspace\n')
         assignin('base','debug_ME',ME)
         assignin('base','debug_streaming',obj)
+        obj.error_ME = ME;
     end
 end
 end

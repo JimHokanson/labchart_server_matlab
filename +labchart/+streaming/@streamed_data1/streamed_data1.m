@@ -30,6 +30,16 @@ classdef streamed_data1 < handle
     %   Time J: x345yyyyyyyyyxxxxxxxxxxxxxxx345yyyyy 
     %
     %   Thus valid data grabs always go from the pointer '.' backwards
+    %
+    %
+    %   Add Data Outline/Hooks
+    %   -------------------------------------------------------------------
+    %   - Initialization
+    %   - Removing sample and hold
+    %   - new_data_processor() <= if exists
+    %   - plotting new data <= if plot exists
+    %   - new_data_processor2() <= if exists
+    %
     %                                   
     %   Benefits
     %   --------
@@ -44,9 +54,59 @@ classdef streamed_data1 < handle
     %   ------------
     %   1) Support downsampling beyond simply removing the sample and hold 
     %      data.
+    %
+    %   Example
+    %   -------
+    %   d = labchart.getActiveDocument();
+    %
+    %   %Setup plotting
+    %   %------------------
+    %   clf
+    %   h1 = subplot(3,1,1);
+    %   h2 = subplot(3,1,2);
+    %   h3 = subplot(3,1,3);
+    %
+    %   %Initialize Streams
+    %   %------------------
+    %   fs = 1000;
+    %   fs2 = 20000;
+    %   n_seconds_valid = 10;
+    %   %fs,n_seconds_keep_valid,chan_index_or_name
+    %   s1 = labchart.streaming.streamed_data1(fs,n_seconds_valid,'void volume low pass ','h_axes',h1,'plot_options',{'Color','r'},'axis_width_seconds',20);
+    %   s2 = labchart.streaming.streamed_data1(fs,n_seconds_valid,'bladder pressure','h_axes',h2,'plot_options',{'Color','g'},'axis_width_seconds',20);
+    %   s3 = labchart.streaming.streamed_data1(fs2,n_seconds_valid,'stim1','h_axes',h3,'plot_options',{'Color','b'},'axis_width_seconds',20);
+    %
+    %   %Note, by default we hold onto 10x n_seconds_valid for plotting
+    %
+    %   %Let's filter the incoming data for s1
+    %   %order,cutoff,sampling_rate,type
+    %   filt_def = labchart.streaming.processors.butterworth_filter(2,5,fs,'low');
+    %   s1.new_data_processor = @filt_def.filter;
+    %   
+    %   %TODO: Add on s2 example ...
+    %
+    %   %<function_name>(streaming_obj,doc)
+    %   s1.callback = @labchart.streaming.callback_examples.nValidSamples;
+    %   %Alternatively
+    %   s1.callback = @labchart.streaming.callback_examples.averageSamplesAddComment;
+    %   
+    %   
+    %   s1.register(d,{s2,s3})
+    %
+    %   s1.register(d,s2)
+    %
+    %
+    %
+    %
+    %   %When done ...
+    %   %----------------------
+    %   d.stopEvents
     
     properties
-        data
+        user_data %Put whatever you want in here ...
+        
+        data %The buffer of data. Once a sufficient time has elapsed it
+        %will always keep at least 'n_seconds_keep_valid' worth of data
         
         d0 = '-- properties --'
         fs %sampling rate
@@ -65,12 +125,15 @@ classdef streamed_data1 < handle
         axis_width_seconds
         auto_detect_record_change
         buffer_muliplier
-        callback
+        callback %<function_name>(streaming_obj,doc)
         callback_only_when_ready
         h_axes
         plot_options
-        new_data_processor
+        new_data_processor %data_out = <function_name>(data_in,is_first_call)
+        new_data_processor2 %data_out = <function_name>(data_in,is_first_call)
         remove_sample_hold 
+        
+        
         
         d3 = '-----   state   -----'
         block_initialized = false %
@@ -85,6 +148,13 @@ classdef streamed_data1 < handle
         error_thrown = false %On error in the callback we toggle this
         %so that we don't have a ton of errors getting thrown
         h_line
+        error_ME
+        
+        %TODO: Do we want to hold onto the data at each stage of the
+        %processing - we could make this behavior optional
+        %new_raw
+        %new_after_p1
+        %new_after_p2
         
         
         d4 = '----- buffer state ------'
@@ -99,11 +169,14 @@ classdef streamed_data1 < handle
         
         
         d5 = '---- performance ----'
+        n_simple_adds = 0
+        n_buffer_resets = 0
         n_add_data_calls = 0
-        add_data_times = zeros(1,100)
-        add_data_times_I = 0
-        callback_times = zeros(1,100)
-        callback_times_I = 0
+        ms_per_callback = zeros(1,100)
+        ms_since_last_callback = zeros(1,100)
+        n_samples_added = zeros(1,100);
+        perf_I = 0
+        last_callback_time = []
         h_tic_start
     end
     
@@ -170,6 +243,9 @@ classdef streamed_data1 < handle
             %
             %       Note that 'is_first_call' is true when the underlying
             %       buffer has just been initialized (or re-initialized).
+            %   new_data_processor2 : callback
+            %       Same as new_data_processor() but occurs after plotting
+            %       rather than before ...
             %   plot_options : cell
             %       Pass this in to control properties of plotting. For
             %       example you could pass in {'color','r'}
@@ -205,6 +281,7 @@ classdef streamed_data1 < handle
             in.callback_only_when_ready = true;
             in.h_axes = [];
             in.new_data_processor = [];
+            in.new_data_processor2 = [];
             in.plot_options = {};
             in.remove_sample_hold = true;
             in = labchart.sl.in.processVarargin(in,varargin);
@@ -229,6 +306,7 @@ classdef streamed_data1 < handle
             
             obj.h_axes = in.h_axes;
             obj.new_data_processor = in.new_data_processor;
+            obj.new_data_processor2 = in.new_data_processor2;
             obj.plot_options = in.plot_options;
             obj.remove_sample_hold = in.remove_sample_hold;
         end
@@ -236,14 +314,64 @@ classdef streamed_data1 < handle
         %       - in other words, currently the only unregister we call
         %       is for everything, can we be more precise?
         %TODO: What happens if we register twice???
-        function register(h_doc)
+        function pipeline = getPipeline(obj)
+            
+            pipeline = {'Data requested from Labchart'};
+            if obj.decimation_step_size ~= 1
+                pipeline = [pipeline; ...
+                    sprintf('Removing sample/hold, keeping every %d sample',obj.decimation_step_size)];
+            end
+            
+            if ~isempty(obj.new_data_processor)
+                pipeline = [pipeline; 
+                    sprintf('Processing new data before plotting with %s',func2str(obj.new_data_processor))];
+            end
+            
+            if isvalid(obj.h_axes)
+               %TODO: Really we need a switch on whether initialized or not
+               %if initialized we need to check line status
+               pipeline = [pipeline; 
+                    'Plotting new data'];
+            end
+            
+            if ~isempty(obj.new_data_processor2)
+                pipeline = [pipeline; 
+                    sprintf('Processing new data after plotting with %s',func2str(obj.new_data_processor2))];
+            end
+            
+            pipeline = [pipeline; 
+                    'Data added to buffer'];
+                
+            if ~isempty(obj.callback)
+                pipeline = [pipeline; 
+                    sprintf('Callback after data has been placed in buffer: %s',func2str(obj.callback))];
+            end    
+        end
+        function register(obj,h_doc,other_streams)
             %
-            %   Makes it so that on new samples we add them to the class
-            fh = @(varargin)obj.addData(h_doc);
-            h_doc.registerOnNewSamplesCallback(fh);
+            %   register(obj,h_doc,*other_streams)
+            %
+            %   This registers this stream with the document so that new
+            %   samples are added to this stream
+            %
+            %   Optional Inputs
+            %   ---------------
+            %   other_streams : cell array
+            %       Other streams that should also be registered in the
+            %       same callback. Order of execution of the adding is:
+            %           - this stream first
+            %           - the other streams, first to last
+            
+            if nargin == 2
+                fh = @(varargin)obj.addData(h_doc);
+                h_doc.registerOnNewSamplesCallback(fh);
+            else
+                h__registerMultipleStreams(obj,h_doc,other_streams)
+            end
         end
         
-        function user_data = getData(obj)
+        function [user_data,time] = getData(obj)
+            %TODO: Add time
             last_I = obj.last_valid_I;
             n_valid_goal = obj.n_samples_keep_valid;
             if last_I < n_valid_goal
@@ -251,12 +379,74 @@ classdef streamed_data1 < handle
             else
                 user_data = obj.data(last_I-n_valid_goal+1:last_I);
             end
+            
+            if nargout == 2
+%             x1 = obj.last_grab_start/obj.ticks_per_second;
+%             x2 = obj.last_grab_end/obj.ticks_per_second;
+%             x = x1:obj.data_dt:x2;
+                n_samples_data = length(user_data);
+                
+                %Let's say our step size is 10
+                %grabbed from 11 to 60
+                %1,11,21,31,41,51  <= samples we've kept
+                %   1  2  3  4  5  <= indices for our grab (5 samples
+                %   keeping)
+                %
+                %
+                %s2 = 60 - 10 + 1 => 51
+                %s1 = 51 - 10*(5-1)
+                %     51 - 40 => 11
+                
+                s2 = obj.last_grab_end; %This is slightly off if we decimate
+                s2 = s2 - obj.decimation_step_size+1;
+                s1 = s2 - obj.decimation_step_size*(n_samples_data-1);
+                
+                %Samples to time ...
+                x1 = s1/obj.ticks_per_second;
+                x2 = s2/obj.ticks_per_second;
+                
+                time = x1:obj.data_dt:x2;
+                
+                
+            else
+                time = [];
+            end
         end
         function reset(obj)
+            %??? reset performance???
             obj.block_initialized = false;
             obj.error_thrown = false;
+            obj.h_tic_start = [];
         end
     end
 end
 
+function h__registerMultipleStreams(obj,h_doc,other_streams)
+%
+%   TODO: Document this ...
+%
+%   See Also
+%   --------
+%   h__newSamplesCallbackMultipleStreams
+if ~iscell(other_streams)
+    other_streams = num2cell(other_streams);
+end
+    
+all_streams = [{obj} other_streams];
+
+fh = @(varargin)h__newSamplesCallbackMultipleStreams(h_doc,all_streams);
+h_doc.registerOnNewSamplesCallback(fh);
+
+end
+
+function h__newSamplesCallbackMultipleStreams(h_doc,streams)
+%
+%   TODO: Document this
+%
+%   This is the actuall callback, which calls addData for each stream
+    for i = 1:length(streams)
+        cur_stream = streams{i};
+        cur_stream.addData(h_doc)
+    end
+end
 

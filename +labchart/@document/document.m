@@ -191,6 +191,9 @@ classdef document < handle
             end
             obj.h.release()
         end
+        function stopEvents(obj)
+           obj.unregisterAllEvents();
+        end
         function unregisterAllEvents(obj)
             if ~isempty(obj.event_listeners)
                 obj.h.unregisterallevents();

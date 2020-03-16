@@ -10,6 +10,7 @@ classdef fake_streaming_doc
     %   - get data ...
     
     properties
+        h
         current_record = 1 %This can be read or written to.
         ticks_per_second = 20000
     end
@@ -20,6 +21,13 @@ classdef fake_streaming_doc
         function output = getSecondsPerTick(current_record)
             output = 1/obj.ticks_per_second;
         end
+%         function get
     end
 end
 
+% data_vector = doc.h.GetChannelData(...
+%     AS_DOUBLE,...
+%     channel_number_1b,...
+%     block_number_1b,...
+%     start_I,...
+%     n_samples);
