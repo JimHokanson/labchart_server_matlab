@@ -49,6 +49,9 @@ classdef record
             obj.id = record_id;
             obj.lc_id = record_id+1;
         end
+        %GetUnits(int,int) - channel number, block number
+        
+        
         %This is implemented in the document class
 %         function data = getChannelData(obj,name_or_index,block_id,varargin)
 %             
