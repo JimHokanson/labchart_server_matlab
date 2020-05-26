@@ -276,6 +276,10 @@ classdef document < handle
         function ticks_per_sec = getTicksPerSecond(obj,block_number_1b)
             ticks_per_sec = 1./obj.getSecondsPerTick(block_number_1b);
         end
+        function sampling_rate = getRecordGlobalSamplingRate(obj,block_number_1b)
+            seconds = getSecondsPerTick(obj,block_number_1b);
+            sampling_rate = 1/seconds;
+        end
         function seconds = getSecondsPerTick(obj,block_number_1b)
             %TODO: try/catch with block check
             seconds = obj.h.GetRecordSecsPerTick(block_number_1b-1);
@@ -414,9 +418,15 @@ classdef document < handle
             %   %Alternatively ...
             %   flag = doc.hasData('stim2',block_number);
             
-            temp_data = obj.getChannelData(channel_number_1b_or_name,...
-                block_number_1b,1,1,'return_obj',false);
-            flag = ~isnan(temp_data);
+            missing_ok = true;
+            I = h__chanNameToIndex(obj,channel_number_1b_or_name,missing_ok);
+            if isempty(I)
+                flag = false;
+            else
+                temp_data = obj.getChannelData(channel_number_1b_or_name,...
+                    block_number_1b,1,1,'return_obj',false);
+                flag = ~isnan(temp_data);
+            end
             
         end
         function [data,time] = getChannelData(obj,...
@@ -522,13 +532,19 @@ classdef document < handle
                 n_samples);
             
             if in.return_obj && ~isempty(which('sci.time_series.data'))
+                %This is incorrect as it grabs the last block and that
+                %may be incorrect (if channel is off units become '')
+                %or they may change between blocks with the bioamp => mV vs
+                %uV
+                %units = obj.units{channel_number_1b};
+                units = obj.h.GetUnits(channel_number_1b,block_number_1b);
                 %Note, this requires Jims Matlab Standard Library
                 %   https://github.com/JimHokanson/matlab_standard_library
                 tps = obj.getTicksPerSecond(block_number_1b);
                 dt = 1/tps;
                 data = sci.time_series.data(data_vector',dt,...
                     'y_label',obj.channel_names{channel_number_1b},...
-                    'units',obj.units{channel_number_1b});
+                    'units',units);
             else
                 data = data_vector;
             end
@@ -608,6 +624,30 @@ classdef document < handle
             
             obj.h.AddCommentAtSelection(str,channel)
         end
+        %Not needed
+%         function getNonEmptyUnits(obj,channel_1b,record_1b)
+%             
+%             local_h = obj.h;
+%             
+%             units = local_h.GetUnits(channel_1b,record_1b);
+%             if isempty(units)
+%                 %Scan left
+%                 record_1b = record_1b - 1;
+%                 while (record_1b > 0)
+%                    units = local_h.GetUnits(channel_1b,record_1b);
+%                    if ~isempty(units)
+%                        
+%                    end
+%                 end
+%             end
+%         end
+        function units = getAllChannelUnits(obj,channel_1b)
+            units = cell(1,obj.number_of_records);
+            for i = 1:obj.number_of_records
+               units{i} = obj.h.GetUnits(channel_1b,i); 
+            end
+        end
+        
         function selectChannel(obj,channel_1b__or_name)
             %
             %   d.selectChannel(channel_1b__or_name)
@@ -664,13 +704,31 @@ end
 %     end
 %     doc.release
 
-function I = h__chanNameToIndex(obj,name)
+function I = h__chanNameToIndex(obj,name,missing_ok)
+
+%Hack to avoid checking ...., should be cleaned up ...
+if isnumeric(name)
+   I = name; 
+end
+
+if nargin < 3
+    missing_ok = false;
+end
 
 if isempty(obj.channel_names)
-    error('No channels available, this happens when data collection has not yet started')
+    if missing_ok
+        I = [];
+    else
+        error('No channels available, this happens when data collection has not yet started')
+    end
 else
+    if missing_ok
+        n_rule = 0; %0 or 1
+    else
+        n_rule = 1; %only 1
+    end
     I = labchart.sl.str.findMatches(name,obj.channel_names,...
-        'partial_match',true,'n_rule',1,'multi_result_rule','exact_or_error');
+        'partial_match',true,'n_rule',n_rule,'multi_result_rule','exact_or_error');
 end
 
 % % % channel_number_1b = find(strcmp(channel_number_1b_or_char,obj.channel_names));
