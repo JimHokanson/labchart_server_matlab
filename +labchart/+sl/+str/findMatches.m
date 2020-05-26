@@ -114,7 +114,9 @@ switch in.n_rule
             error('Multiple matches found for: "%s" but only 0 or 1 allowed',input_string);
         end
     case 1 %match 1, but follow rule
-        if n_matches ~= 1
+        if n_matches == 0
+            error('Match rule needs 1 match but no matches found'); 
+        elseif n_matches ~= 1
             switch in.multi_result_rule
                 case 'error'
                     if n_matches == 0
