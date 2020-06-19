@@ -19,6 +19,23 @@ classdef stim < handle
     %   1) Provide an initialize command which sets everything to known
     %   values so that we can internally track all values.
     
+    
+    %{
+    
+    %Example Code
+    %------------------------
+    d = labchart.getActiveDocument;
+    w = d.stimulator.setStimulatorWaveform(1, 'pulse'); %set channel 1 to biphasic
+    w.setBaseline(0);
+    w.setStartDelay(0, 's');
+    w.setNPulses(-1);
+    w.setPulseRate(10,'Hz')
+    JAH TODO: Finish this ...
+    
+    %}
+    
+    
+    
 %   ' Begin SetStimulatorValue
 % 	outputIndex = 0
 % 	paramId = "_Delay6"
@@ -60,6 +77,7 @@ classdef stim < handle
     properties
         h %Interface.ADInstruments_LabChart_1.0_Type_Library.IADIChartDocument
         
+        d0 = '----- options -------'
         allow_null_ops = true
         %If this is true, where possible we should check locally
         %for the current value and not run a command unless we need to.
@@ -68,7 +86,7 @@ classdef stim < handle
         %parameters on the GUI. Note that we can technically run the
         %stimulator without the stimulator window being open.
         
-        
+        d1 = '------ read only ------'
         %This is kept track of internally but might be invalid
         %if the user changes anything sine we can't read properties ...
         chan1_enabled = false
@@ -203,12 +221,12 @@ classdef stim < handle
             invoke(obj.h,'SetStimulatorDifferential',channel_0b,value);
             obj.differential_enabled = value;
         end
-        function setStimulatorWaveform(obj,channel_1b,waveform_name)
+        function waveform = setStimulatorWaveform(obj,channel_1b,waveform_name)
             %
             %   setStimulatorWaveform(obj,channel_1b,name)
             %
-            %   obj.setStimulatorWaveform(2,'User waveform - 40Hz Burst');
             %   obj.setStimulatorWaveform(1,'Biphasic Pulse');
+            %   obj.setStimulatorWaveform(1,'Pulse');
            
             switch lower(waveform_name)
                 case 'arithmetic pulse'
@@ -233,24 +251,37 @@ classdef stim < handle
                     error('Waveform Option not recognized')
             end
                 
+            
+            
             if channel_1b == 1
-                if obj.allow_null_ops && strcmp(obj.chan1_internal_waveform_name,out_name)
-                    return
-                end
-                if lower(waveform_name) == 'biphasic pulse' %TEMPORARY HACK
-                    %TODO: update this to be automatically based on the
-                    %input!!!!
-                obj.waveform1 = labchart.stim_waveforms.('biphasic_pulse')(obj.h, channel_1b-1);
-                end
+                int_name = obj.chan1_internal_waveform_name;
+            else
+                int_name = obj.chan2_internal_waveform_name;
+            end
+            
+            %Setting the waveform can cause a new block to form
+            %We try and avoid this ...
+            %But since we are running open loop, we might want to always do
+            %this ...
+            if obj.allow_null_ops && strcmp(int_name,out_name)
+                return
+            end
+            
+            switch lower(waveform_name)
+                case 'biphasic pulse'
+                    waveform = labchart.stim_waveforms.biphasic_pulse(obj.h, channel_1b-1);
+                case 'pulse'
+                    waveform = labchart.stim_waveforms.pulse(obj.h, channel_1b-1);
+                otherwise
+                    error('Not yet implemented')
+            end
+            
+            if channel_1b == 1
+                obj.waveform1 = waveform;
                 obj.chan1_user_waveform_name = lower(waveform_name);
                 obj.chan1_internal_waveform_name = out_name;
             else
-                if obj.allow_null_ops && strcmp(obj.chan2_internal_waveform_name,out_name)
-                    return
-                end
-                if lower(waveform_name) == 'biphasic pulse' %TEMPORARY HACK
-                obj.waveform2 = labchart.stim_waveforms.('biphasic_pulse')(obj.h, channel_1b-1);
-                end
+                obj.waveform2 = waveform;
                 obj.chan2_user_waveform_name = lower(waveform_name);
                 obj.chan2_internal_waveform_name = out_name;
             end
