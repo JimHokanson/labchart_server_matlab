@@ -21,6 +21,6 @@ if ~isempty(active_doc)
     end
 end
 
-doc = app.open_document(file_path);
+doc = app.openDocument(file_path);
 
 end
