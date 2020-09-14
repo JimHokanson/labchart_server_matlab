@@ -537,14 +537,14 @@ classdef document < handle
                 %or they may change between blocks with the bioamp => mV vs
                 %uV
                 %units = obj.units{channel_number_1b};
-                units = obj.h.GetUnits(channel_number_1b,block_number_1b);
+                local_units = obj.h.GetUnits(channel_number_1b,block_number_1b);
                 %Note, this requires Jims Matlab Standard Library
                 %   https://github.com/JimHokanson/matlab_standard_library
                 tps = obj.getTicksPerSecond(block_number_1b);
                 dt = 1/tps;
                 data = sci.time_series.data(data_vector',dt,...
                     'y_label',obj.channel_names{channel_number_1b},...
-                    'units',units);
+                    'units',local_units);
             else
                 data = data_vector;
             end
@@ -695,7 +695,12 @@ classdef document < handle
         function save(obj)
             obj.h.Save();
         end
-        
+        function saveAs(obj,file_path)
+            %TODO: If no file_path, do a prompt, not sure if it makes sense
+            %to try and punt the ui interface and saving in Labchart,
+            %rather than doing a uiputfile in Matlab.
+            obj.h.SaveAs(file_path);
+        end
     end
 end
 

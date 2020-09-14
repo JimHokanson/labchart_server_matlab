@@ -82,7 +82,12 @@ classdef application
     end
     
     methods
-        function opened_doc = open_document(obj,file_path)
+        function opened_doc = open_document(obj,varargin)
+           %obsolete ... 
+           %TODO: Add warning ...
+           opened_doc = openDocument(obj,varargin{:});
+        end
+        function opened_doc = openDocument(obj,file_path)
             %
             %   opened_doc = open_document(obj,file_path)
             %
