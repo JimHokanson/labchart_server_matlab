@@ -265,6 +265,12 @@ classdef document < handle
             
             obj.h.registerevent({'OnFinishSamplingBlock',callback_fh})
         end
+        function close(obj)
+            %You can optionally force closing of an unsaved document with
+            %an optional true (NOT IMPLEMENTED) - might name as
+            %forceClose()
+            obj.h.Close() 
+        end
         function n_ticks = getRecordLengthInTicks(obj,block_number_1b)
             n_ticks = obj.h.GetRecordLength(block_number_1b-1);
         end
