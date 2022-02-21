@@ -27,7 +27,7 @@ function active = getActiveDocument(varargin)
 
 
 in.missing_ok = false;
-in = sl.in.processVarargin(in,varargin);
+in = labchart.sl.in.processVarargin(in,varargin);
 
 if in.missing_ok
     running = labchart.application.checkIfRunning();
