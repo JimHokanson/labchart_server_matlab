@@ -86,7 +86,7 @@ AD Instruments provides a COM server for LabChart that allows sending commands t
 1. Open Excel
 2. Press 'alt+F11'
 3. Select menu => tools => references
-4. Check the box for AD Instruments
+4. Check the box for AD Instruments (in new versions this seems to be missing, and I need to manually add the Labchart executable - LabChart8.exe)
 5. Select menu => view => object browser
 6. Go to the top of the window and select 'ADIChart'
 
