@@ -1,0 +1,1 @@
+These were copied from the Labchart Program Files folder. These are examples from ADInstruments. They are pretty awful but they give some hints as to how to work with the library. My code is better ;)
