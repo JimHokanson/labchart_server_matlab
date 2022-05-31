@@ -105,8 +105,12 @@ classdef streamed_data1 < handle
     properties
         user_data %Put whatever you want in here ...
         
-        data %The buffer of data. Once a sufficient time has elapsed it
+        %The buffer of data. Once a sufficient time has elapsed it
         %will always keep at least 'n_seconds_keep_valid' worth of data
+        data 
+        
+        new_data %Most recently retrieved data. 
+        %TODO: Make holding onto this optional ...
         
         d0 = '-- properties --'
         fs %sampling rate
@@ -217,6 +221,9 @@ classdef streamed_data1 < handle
             %       performance but more overall memory usage. This also
             %       impacts how much data are retained when plotting (if
             %       h_axes is specified).
+            %           TODO: Might be good to decouple these as the
+            %           plotting and buffer are two different paths.
+            %
             %   callback : default []
             %       If specified this will be called after the internal
             %       buffer has been updated with the newest data.The 
@@ -297,6 +304,9 @@ classdef streamed_data1 < handle
             obj.auto_detect_record_change = in.auto_detect_record_change;
             obj.axis_width_seconds = in.axis_width_seconds;
             %This 1.1 is somewhat arbitrary ...
+            %
+            %   TODO: I think we should probably just make this 1. Verify
+            %   that it works ...
             if in.buffer_muliplier <= 1.1
                 in.buffer_multiplier = 1.1;
             end
@@ -363,6 +373,8 @@ classdef streamed_data1 < handle
             %           - the other streams, first to last
             
             if nargin == 2
+                %I don't know what the inputs are from LabChart, we
+                %just ignore them (use of varargin)
                 fh = @(varargin)obj.addData(h_doc);
                 h_doc.registerOnNewSamplesCallback(fh);
             else
@@ -371,6 +383,12 @@ classdef streamed_data1 < handle
         end
         
         function [user_data,time] = getData(obj)
+            %
+            %   [user_data,time] = getData(obj)
+            %
+            %   
+            %   
+            
             %TODO: Add time
             last_I = obj.last_valid_I;
             n_valid_goal = obj.n_samples_keep_valid;
@@ -423,7 +441,18 @@ end
 
 function h__registerMultipleStreams(obj,h_doc,other_streams)
 %
-%   TODO: Document this ...
+%   For multiple streams, we essentially create a new callback that
+%   calls our callback for each stream. Note, this is not the same as the
+%   user's callback which may or may not be defined for each stream.
+%
+%   Normal (single chan):
+%       - callback: addData(this_stream)
+%           - addData - call's user's callback if present
+%   Multi chan:
+%       - callback: h__newSamplesCallbackMultipleStreams(streams)
+%           - calls addData for each stream
+%               - addData - call's user's callback if present
+%
 %
 %   See Also
 %   --------

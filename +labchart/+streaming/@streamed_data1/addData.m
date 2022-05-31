@@ -190,6 +190,9 @@ try
             obj.last_valid_I = end_I;
         end
         
+        obj.new_data = new_data;
+        
+        
         obj.n_seconds_valid = obj.last_valid_I*obj.data_dt;
         
         %Callback ...
