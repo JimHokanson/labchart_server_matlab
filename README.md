@@ -38,7 +38,7 @@ end_time = 230; %seconds
 The underlying interface has three issues that the user should be aware of:
 1. All data are sampled at the same rate, even if the data are saved to disk at different rates. Thus if you have two channels, one sampled at 10 Hz, and another at 1000 Hz, if you request 1 seconds worth of data from the first channel (10 Hz) you'll get 1000 samples, not 10. In these instances all data are returned in a sample-and-hold format. In other words, for the 10 Hz channel, values will only change at 10 Hz; all other values are repeats (held values) of the changed value.
 2. My software could optionally hide this sample-and-hold behavior, but there is no way of knowing for sure what the sampling rate is of each channel. I could try and detect this based on finding repeat values, but I haven't implemented this feature.
-3. The file reading SDK does not provide the ability to read calculated channels, i.e. channels that are simply mathematical derivations of input channels. For example, one channel could simply be another channel after filtering. This repo allows the user to request these calculated channels.
+3. The file reading SDK (https://github.com/JimHokanson/adinstruments_sdk_matlab) does not provide the ability to read calculated channels, i.e. channels that are simply mathematical derivations of input channels. For example, one channel could simply be another channel after filtering. In contrast, this repo allows the user to request calculated channels.
 
 ### Time Information ###
 
@@ -50,7 +50,7 @@ current_record = doc.current_record; %-1 if not sampling
 n_ticks = doc.getRecordLengthInTicks(current_record);
 ```
 
-If we log a start "time" (record # and tick #) and stop time then we can request data within this time window for averaging. I personally will record sync pulses to know when stimuli occurred. Additionally, I log stimulus specific information internally in my Matlab program so that I can chop up the averages any way that I'd like.
+If we log a start "time" (record # and tick #) and stop time then we can request data within this time window for averaging. I personally will record sync pulses to know when stimuli occurred. Additionally, I log stimulus specific information (stimulus parameters, meta data) internally in my MATLAB program so that I can display the results any way that I'd like.
 
 
 ### Streaming and Callbacks ###
@@ -67,9 +67,9 @@ doc = labchart.getActiveDocument();
 doc.registerOnNewSamplesCallback(@labchart.callbacks.newData);
 ```
 
-I've implemented a class that stores a specified # of seconds worth of data as it comes in from Labchart. Here's an example:
+I've implemented a class that stores a specified # of seconds worth of data as it comes in from Labchart. This makes it somewhat straightforward to look at recent data and do some operation on it.
 
-JAH TODO
+More info on streaming to MATLAB [can be found here](documentation/streaming.md)
 
 ## Requirements
 
