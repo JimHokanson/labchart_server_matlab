@@ -32,7 +32,7 @@ data = doc.getChannelData('my_channel',block_number,start_sample,end_sample);
 chan_number = 1; %1 based
 start_time = 0;
 end_time = 230; %seconds
-[data,time] = d.getChannelData(chan_number,block_number,0,230,'as_time',true)
+[data,time] = doc.getChannelData(chan_number,block_number,start_time,end_time,'as_time',true)
 ```
 
 The underlying interface has three issues that the user should be aware of:
