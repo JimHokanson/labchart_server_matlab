@@ -24,15 +24,15 @@ doc = labchart.getActiveDocument();
 %---------------------------
 block_number = 1;
 start_sample = 1;
-end_sample = 1000;
-data = doc.getChannelData('my_channel',block_number,start_sample,end_sample);
+n_samples = 1000;
+data = doc.getChannelData('my_channel',block_number,start_sample,n_samples);
 
 %Using time instead of samples
 %-----------------------------
 chan_number = 1; %1 based
 start_time = 0;
-end_time = 230; %seconds
-[data,time] = doc.getChannelData(chan_number,block_number,start_time,end_time,'as_time',true)
+n_seconds = 230; %seconds
+[data,time] = doc.getChannelData(chan_number,block_number,start_time,n_seconds,'as_time',true)
 ```
 
 The underlying interface has three issues that the user should be aware of:
